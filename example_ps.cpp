@@ -4,16 +4,14 @@
 using namespace crypto12381;
 
 struct PrivateKey : serialized_field<Zp^2>{};
-
 struct PublicKey : serialized_field<G2^3>{};
+struct Signature : serialized_field<G1^2>{};
 
 struct Keys
 {
     PrivateKey sk;
     PublicKey pk;
 };
-
-struct Signature : serialized_field<G1^2>{};
     
 Keys key_gen(RandomEngine& random)
 {
