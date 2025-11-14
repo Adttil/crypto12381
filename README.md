@@ -1,4 +1,6 @@
 # Crypto12381
+[![license](https://img.shields.io/github/license/Adttil/crypto12381.svg)](https://github.com/Adttil/crypto12381/blob/main/LICENSE.txt)
+[![issues](https://img.shields.io/github/issues/Adttil/crypto12381.svg)](https://github.com/Adttil/crypto12381/issues)
 
 crypto12381 is an esay-to-use cryptographic library based on the elliptic curve BLS12381.
 
