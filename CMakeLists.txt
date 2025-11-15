@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 3.10)
 
 project(CRYPTO12381)
 
-option(CRYPTO12381_INCLUDE_TESTS "build tests" ON)
+option(CRYPTO12381_INCLUDE_EXAMPLES "build examples" ON)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -20,5 +20,5 @@ add_executable(test "test.cpp")
 target_link_libraries(test PRIVATE crypto12381)
 
 if(CRYPTO12381_INCLUDE_TESTS)
-    add_subdirectory(tests)
+    add_subdirectory(examples)
 endif()
