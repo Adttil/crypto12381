@@ -53,6 +53,15 @@ auto n7 = select_in<Zp>(random)；// (7) just same as (1)
 auto n8 = select_in<*G2^2>(random)；// (8) just same as (6)
 ```
 
+# Calculate
+In addition to basic arithmetic operations, crypto12381 also provides operations for variable numbers of elements, such as summation:
+```cpp
+sum(elements);// sum all element in elements
+sum(elements.size(), elements[i]);// same as above
+sum(n, y[i] * m[i]);// sum (y[i] * m[i]) for i in [0, n)
+Σ(n, y[i] * m[i]);// same as above
+```
+
 # Serialize
 Prepare a `trivial-copyable` structure with proper size no matter how it defined.
 ```cpp

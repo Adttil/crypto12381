@@ -74,15 +74,11 @@ namespace crypto12381::ps
             throw std::runtime_error{ "message is too long" };
         }
         auto x = parse<Zp>(sk.x);
+        vector y = parse<Zp>(sk.y);
+
         auto h = random-select_in<*G1>;
 
-        for(size_t i = 0; i < n; ++i)
-        {
-            auto y = parse<Zp>(sk.y[i]);
-            x = (x + y * m[i]).normalize();
-        }
-
-        return serialize(h, h^x);
+        return serialize(h, h^(x + Σ(n, y[i] * m[i])));
     };
 
     bool verify(const PublicKeyN& pk, std::span<const char> message, const Signature& signature)

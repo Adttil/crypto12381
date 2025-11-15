@@ -54,6 +54,36 @@ namespace crypto12381::detail
             return { (chunk_t)Value * l.max, (chunk_t)Value * l.min };
         }
     }
+
+    template<std::integral T>
+    constexpr int sign(T x)
+    {
+        if(x > 0)
+        {
+            return 1;
+        }
+        else if(x < 0)
+        {
+            return -1;
+        }
+        else
+        {
+            return 0;
+        }
+    }
+
+    constexpr size_t operator/(const ChunkRange& l, const ChunkRange& r)noexcept
+    {
+        if(sign(l.min) != sign(r.min))
+        {
+            return l.max / r.max;
+        }
+        if(sign(l.max) != sign(r.max))
+        {
+            return l.min / r.min;
+        }
+        return std::min(l.max / r.max, l.min / r.min);
+    }
 }
 
 #endif

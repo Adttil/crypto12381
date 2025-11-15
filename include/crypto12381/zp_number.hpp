@@ -9,6 +9,7 @@
 #include <miracl-core/bls_BLS12381.h>
 #include <miracl-core/randapi.h>
 
+#include "general.hpp"
 #include "interface.hpp"
 #include "set.hpp"
 #include "constant.hpp"
@@ -65,23 +66,6 @@ namespace crypto12381::detail
     inline constexpr chunk_t head_max_limit2 = ((chunk_t)1 << (head_bits2 - 1)) - 1;
     inline constexpr chunk_t head_min_limit2 = -head_max_limit2;
 
-    template<std::integral T>
-    constexpr T sign(T x)
-    {
-        if(x > 0)
-        {
-            return (T)1;
-        }
-        else if(x < 0)
-        {
-            return (T)-1;
-        }
-        else
-        {
-            return 0;
-        }
-    }
-
     inline constexpr ChunkRange default_range{ 0, 1 };
     inline constexpr ChunkRange rest_range_extrem{ head_min_limit, head_max_limit };
     inline constexpr ChunkRange head_range_extrem{ head_min_limit, head_max_limit };
@@ -95,17 +79,17 @@ namespace crypto12381::detail
     
     struct ZpNumberData
     {
-        chunk_t data[n_chunks];
+        chunk_t chunks[n_chunks];
 
-        constexpr operator chunk_t*()
+        constexpr operator chunk_t*() noexcept
         {
-            return data;
+            return chunks;
         } 
 
         template<class Self>
         constexpr decltype(auto) operator[](this Self&& self, size_t i) noexcept
         {
-            return std::forward_like<Self>(self.data)[i];
+            return std::forward_like<Self>(self.chunks)[i];
         }
 
         friend constexpr bool operator==(const ZpNumberData&, const ZpNumberData&) = default;
@@ -155,10 +139,20 @@ namespace crypto12381::detail
     {
         chunk_t chunks[n_chunks2];
 
-        constexpr operator chunk_t*()
+        constexpr operator chunk_t*() noexcept
         {
             return chunks;
         } 
+
+        ZpNumber2Data& operator=(const ZpNumberData& data) noexcept
+        {
+            *this = {};
+            for(size_t i = 0; i < n_chunks; ++i)
+            {
+                chunks[i] = data[i];
+            }
+            return *this;
+        }
 
         template<class Self>
         constexpr decltype(auto) operator[](this Self&& self, size_t i) noexcept
@@ -400,6 +394,75 @@ namespace crypto12381::detail
             return data(l.normalize()) == data(r.normalize());
         }
 
+        template<std::ranges::range R> 
+        requires specified<std::ranges::range_value_t<R>, ZpNumber>
+        friend constexpr auto sum(std::type_identity<ZpNumber>, R&& r) 
+        {
+            if constexpr(Rest.min == 0 && Rest.max == 0)
+            {
+                return ZpNumber{};
+            }
+            else if(std::ranges::size(r) == 0)
+            {
+                return data.create<ZpNumber<>>();
+            }
+            else
+            {
+                constexpr size_t n = head_range_extrem / Head - 1;
+                constexpr size_t m = rest_range_extrem / Rest - 1;
+                if constexpr(n == 0)
+                {
+                    return sum(constant<Zp>, std::forward<R>(r) 
+                    | std::views::transform([]<typename E>(E&& e){ 
+                        return std::forward<E>(e).normalize(); 
+                    }));
+                }
+                else if constexpr(m == 0)
+                {
+                    return sum(constant<Zp>, std::forward<R>(r)
+                    | std::views::transform([]<typename E>(E&& e){
+                        return std::forward<E>(e).normalize_rests(); 
+                    }));
+                }
+                else
+                {
+                    auto result = data.create<ZpNumber<>>();
+                    auto i = std::ranges::begin(r);
+                    data(result) = data(*i);
+                    size_t j = 0;
+                    size_t k = 0;
+                    for(++i; i != std::ranges::end(r); ++i)
+                    {
+                        data(result) = data(result + *i);
+                        ++j;
+                        ++k;
+                        if(j == n)
+                        {
+                            data(result) = data(result.normalize());
+                            j = 0;
+                            k = 0;
+                            continue;
+                        }
+                        if(k == n)
+                        {
+                            data(result) = data(result.normalize_rests());
+                            k = 0;
+                            continue;
+                        }
+                    }
+                    if(j != 0)
+                    {
+                        data(result) = data(result.normalize());
+                    }
+                    else if(k != 0)
+                    {
+                        data(result) = data(result.normalize_rests());
+                    }
+                    return result;
+                }
+            }
+        }
+
     private:
         constexpr ZpNumber() noexcept = default;
 
@@ -610,6 +673,75 @@ namespace crypto12381::detail
             return data(l.normalize()) == data(r.normalize());
         }
 
+        template<std::ranges::range R> 
+        requires specified<std::ranges::range_value_t<R>, ZpNumber2>
+        friend constexpr auto sum(std::type_identity<ZpNumber2>, R&& r) 
+        {
+            if constexpr(Rest.min == 0 && Rest.max == 0)
+            {
+                return ZpNumber2{};
+            }
+            else if(std::ranges::size(r) == 0)
+            {
+                return data.create<ZpNumber2<>>();
+            }
+            else
+            {
+                constexpr size_t n = head_range_extrem / Head - 1;
+                constexpr size_t m = rest_range_extrem / Rest - 1;
+                if constexpr(n == 0)
+                {
+                    return sum(constant<Zp>, std::forward<R>(r) 
+                    | std::views::transform([]<typename E>(E&& e){ 
+                        return std::forward<E>(e).normalize(); 
+                    }));
+                }
+                else if constexpr(m == 0)
+                {
+                    return sum(constant<Zp>, std::forward<R>(r)
+                    | std::views::transform([]<typename E>(E&& e){
+                        return std::forward<E>(e).normalize_rests(); 
+                    }));
+                }
+                else
+                {
+                    auto result = data.create<ZpNumber2<>>();
+                    auto i = std::ranges::begin(r);
+                    data(result) = data(*i);
+                    size_t j = 0;
+                    size_t k = 0;
+                    for(++i; i != std::ranges::end(r); ++i)
+                    {
+                        data(result) = data(result + *i);
+                        ++j;
+                        ++k;
+                        if(j == n)
+                        {
+                            data(result) = data(result.normalize());
+                            j = 0;
+                            k = 0;
+                            continue;
+                        }
+                        if(k == n)
+                        {
+                            data(result) = data(result.normalize_rests());
+                            k = 0;
+                            continue;
+                        }
+                    }
+                    if(j != 0)
+                    {
+                        data(result) = data(result.normalize());
+                    }
+                    else if(k != 0)
+                    {
+                        data(result) = data(result.normalize_rests());
+                    }
+                    return result;
+                }
+            }
+        }
+
     private:
         constexpr ZpNumber2() noexcept = default;
 
@@ -674,7 +806,7 @@ namespace crypto12381::detail
             result.emplace_back(crypto12381::parse<Zp>(buffer));
         }
 
-        return result;
+        return vector{ std::move(result) };
     }
 
     inline auto hash_to(hash_state&& state, Zp_t) noexcept

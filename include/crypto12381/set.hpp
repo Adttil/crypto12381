@@ -2,12 +2,94 @@
 #define CRYPTO12381_SET_HPP
 
 #include <tuple>
+#include <type_traits>
+#include <ranges>
 
 #include <miracl-core/core.h>
 
+#include "general.hpp"
 #include "random.hpp"
 #include "constant.hpp"
 #include "interface.hpp"
+
+namespace crypto12381::detail
+{
+    template<typename F>
+    struct indexer_fn : F
+    {
+        template<specified<indexer_fn> L, typename R>
+        friend auto operator*(L&& l, R&& r)
+        {
+            return detail::indexer_fn{
+                [l_r = std::tuple<L, R>{ std::forward<L>(l), std::forward<R>(r) }]<typename C>(this C&& sself, size_t i)
+                {
+                    auto&&[l, r] = std::forward_like<C>(l_r);
+                    return l(i) * r(i);
+                }
+            };
+        }
+    };
+
+    struct i_t{};
+}
+
+namespace crypto12381
+{
+    template<std::ranges::view R>
+    struct vector : public std::ranges::view_interface<vector<R>>
+    {
+    public:
+        using std::ranges::view_interface<vector<R>>::operator[];
+
+        vector() requires std::default_initializable<R> = default;
+
+        constexpr vector(R base) 
+        noexcept(std::is_nothrow_move_constructible_v<R>)
+        : base_(std::move(base))
+        {}
+
+        template<class Self>
+        constexpr auto begin(this Self&& self)
+        {
+            return std::ranges::begin(std::forward_like<Self>(self.base_));
+        }
+
+        template<class Self>
+        constexpr auto end(this Self&& self)
+        {
+            return std::ranges::end(std::forward_like<Self>(self.base_));
+        }
+
+
+        template<class Self>
+        constexpr auto size(this Self&& self) requires std::ranges::sized_range<R>
+        {
+            return std::ranges::size(std::forward_like<Self>(self.base_));
+        }
+
+        template<typename Self>
+        auto operator[](this Self&& self, detail::i_t)
+        {
+            return detail::indexer_fn{
+                [r = std::tuple<Self>(std::forward<Self>(self))]<typename Closure>(this Closure&&, size_t i)
+                {
+                    return std::forward_like<Closure>(std::get<0>(r))[i];
+                }
+            };
+        }
+
+    private:
+        R base_;
+    };
+
+    template<typename R>
+    vector(R&& r) -> vector<std::views::all_t<R>>;
+
+    
+}
+
+template <class R>
+constexpr bool std::ranges::enable_borrowed_range<crypto12381::vector<R>> = std::ranges::enable_borrowed_range<R>;
 
 namespace crypto12381
 {
@@ -88,30 +170,73 @@ namespace crypto12381::detail
             return result;
         }();
 
-        constexpr auto operator()(std::span<const char, bytes_size> bytes) const
+        template<typename T>
+        constexpr auto operator()(T&& t) const
         {
-            if constexpr(sizeof...(Set) == 1uz)
+            if constexpr(std::is_trivially_copyable_v<std::remove_cvref_t<T>> && sizeof(t) == bytes_size)
             {
-                return (..., parse(constant<Set>, bytes));
+                return (*this)(std::span{ reinterpret_cast<const char(&)[sizeof(t)]>(t) });
             }
-            else return [&]<size_t...I>(std::index_sequence<I...>){
-                using tpl = std::tuple<constant_t<Set>...>;
-                return std::tuple{
-                    parse(std::tuple_element_t<I, tpl>{}, (bytes.template subspan<offsets[I], sizes[I]>()))...
-                };
+            else if constexpr(std::convertible_to<T&, std::span<const char, bytes_size>>)
+            {
+                const auto bytes = (std::span<const char, bytes_size>)t;
+                if constexpr(sizeof...(Set) == 1uz)
+                {
+                    return (..., parse(constant<Set>, bytes));
+                }
+                else return [&]<size_t...I>(std::index_sequence<I...>){
+                    using tpl = std::tuple<constant_t<Set>...>;
+                    return std::tuple{
+                        parse(std::tuple_element_t<I, tpl>{}, (bytes.template subspan<offsets[I], sizes[I]>()))...
+                    };
 
-                // clang bug
-                // return std::tuple{
-                //     parse(constant_t<Set>{}, (bytes.template subspan<offsets[I], sizes[I]>()))...
-                // };
-            }(std::make_index_sequence<sizeof...(Set)>{});
+                    // clang bug
+                    // return std::tuple{
+                    //     parse(constant_t<Set>{}, (bytes.template subspan<offsets[I], sizes[I]>()))...
+                    // };
+                }(std::make_index_sequence<sizeof...(Set)>{});
+            }
+            else if constexpr(std::ranges::range<T> && requires(std::ranges::range_value_t<T> e){ (*this)(e); })
+            {
+                return vector{ std::forward<T>(t) | std::views::transform(crypto12381::parse<Set...>) };
+            }
+            else
+            {
+                static_assert(false, "can not parse");
+            }
         }
 
-        template<typename T> requires (std::is_trivially_copyable_v<T>)
-        constexpr auto operator()(const T& t) const
-        {
-            return (*this)(std::span{ reinterpret_cast<const char(&)[sizeof(T)]>(t) });
-        }
+        // constexpr auto operator()(std::span<const char, bytes_size> bytes) const
+        // {
+        //     if constexpr(sizeof...(Set) == 1uz)
+        //     {
+        //         return (..., parse(constant<Set>, bytes));
+        //     }
+        //     else return [&]<size_t...I>(std::index_sequence<I...>){
+        //         using tpl = std::tuple<constant_t<Set>...>;
+        //         return std::tuple{
+        //             parse(std::tuple_element_t<I, tpl>{}, (bytes.template subspan<offsets[I], sizes[I]>()))...
+        //         };
+
+        //         // clang bug
+        //         // return std::tuple{
+        //         //     parse(constant_t<Set>{}, (bytes.template subspan<offsets[I], sizes[I]>()))...
+        //         // };
+        //     }(std::make_index_sequence<sizeof...(Set)>{});
+        // }
+
+        // template<typename T> requires (std::is_trivially_copyable_v<T>)
+        // constexpr auto operator()(const T& t) const
+        // {
+        //     return (*this)(std::span{ reinterpret_cast<const char(&)[sizeof(T)]>(t) });
+        // }
+
+        // template<std::ranges::range R> requires (sizeof...(Set) == 1uz)
+        // constexpr auto operator()(R&& r) const
+        // requires requires(std::ranges::range_value_t<R> e){ (*this)(e); }
+        // {
+        //     return vector{ std::forward<R>(r) | std::views::transform(crypto12381::parse<Set...>) };
+        // }
     };
 
     template<auto Set>
@@ -332,11 +457,50 @@ namespace crypto12381::detail
             return hash_state{} | t;
         }
     };
+
+    void sum();
+
+    struct sum_fn
+    {
+        template<std::ranges::range R>
+        constexpr auto operator()(R&& r) const
+        {
+            return sum(std::type_identity<std::remove_cvref_t<std::ranges::range_value_t<R>>>{}, std::forward<R>(r));
+        }
+
+        template<typename F>
+        constexpr auto operator()(size_t n, F&& f) const
+        {
+            return (*this)(std::views::iota(0uz, n) | std::views::transform(std::forward<F>(f)));
+        }
+    };
+
+    void product() = delete;
+
+    struct product_fn
+    {
+        template<std::ranges::range R>
+        constexpr auto operator()(R&& r) const
+        {
+            constexpr auto set = group_of<std::ranges::range_value_t<R>>();
+            return product(constant<set>, std::forward<R>(r));
+        }
+    };    
 }
 
 namespace crypto12381
 {
     inline constexpr detail::hash_fn hash{};
+    
+    inline constexpr detail::sum_fn sum{};
+
+    inline constexpr detail::product_fn product{};
+
+    inline constexpr detail::i_t i{};
+
+    inline constexpr auto Σ = sum;
 }
+
+
 
 #endif
