@@ -195,6 +195,9 @@ namespace crypto12381::detail
             }
         }
 
+        constexpr ZpNumber(const ZpNumber&) = default;
+        constexpr ZpNumber(ZpNumber&&) = default;
+
         void serialize(std::span<char, serialized_size<Zp>> bytes) const noexcept
         {
             BLS12381_BIG::BIG_toBytes(bytes.data(), auto{ data_ });
@@ -465,6 +468,9 @@ namespace crypto12381::detail
 
     private:
         constexpr ZpNumber() noexcept = default;
+
+        ZpNumber& operator=(const ZpNumber&) = default;
+        ZpNumber& operator=(ZpNumber&&) = default;
 
         template<size_t N>
         static constexpr ZpNumber<> get_np() noexcept

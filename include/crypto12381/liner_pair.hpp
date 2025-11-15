@@ -41,6 +41,9 @@ namespace crypto12381::detail
     {
         friend DataAccessor;
     public:
+        constexpr GTPoint(const GTPoint&) = default;
+        constexpr GTPoint(GTPoint&&) = default;
+
         template<typename Self>
         constexpr decltype(auto) GT_point(this Self&& self) noexcept
         {
@@ -125,6 +128,9 @@ namespace crypto12381::detail
 
     private:
         constexpr GTPoint() noexcept = default;
+
+        GTPoint& operator=(const GTPoint&) = default;
+        GTPoint& operator=(GTPoint&&) = default;
 
         GTPointData data_;
     };

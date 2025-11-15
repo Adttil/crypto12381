@@ -69,6 +69,9 @@ namespace crypto12381::detail
             BLS12381::ECP2_fromOctet(data_, &buffer_view);
         }
 
+        constexpr G2Point(const G2Point&) = default;
+        constexpr G2Point(G2Point&&) = default;
+
         void serialize(std::span<char, serialized_size<G2>> bytes) const noexcept
         {
             core::octet buffer_view{
@@ -193,8 +196,24 @@ namespace crypto12381::detail
             return BLS12381::ECP2_equals(data(l.G2_point()), data(r.G2_point())) == 1;
         }
 
+        template<std::ranges::range R> 
+        requires specified<std::ranges::range_value_t<R>, G2Point>
+        friend constexpr auto product(std::type_identity<G2Point>, R&& r) 
+        {
+            G2Point result;
+            BLS12381::ECP2_inf(result.data_);
+            for(auto&& p : std::forward<R>(r))
+            {
+                BLS12381::ECP2_add(result.data_, p.G2_point().data_);
+            }
+            return result;
+        }
+
     private:
         constexpr G2Point() noexcept = default;
+
+        G2Point& operator=(const G2Point&) = default;
+        G2Point& operator=(G2Point&&) = default;
         
         static G2Point& get_default_generator() noexcept
         {

@@ -28,6 +28,18 @@ namespace crypto12381::detail
                 }
             };
         }
+
+        template<specified<indexer_fn> L, typename R>
+        friend auto operator^(L&& l, R&& r)
+        {
+            return detail::indexer_fn{
+                [l_r = std::tuple<L, R>{ std::forward<L>(l), std::forward<R>(r) }]<typename C>(this C&& sself, size_t i)
+                {
+                    auto&&[l, r] = std::forward_like<C>(l_r);
+                    return l(i) ^ r(i);
+                }
+            };
+        }
     };
 
     struct i_t{};
@@ -482,8 +494,13 @@ namespace crypto12381::detail
         template<std::ranges::range R>
         constexpr auto operator()(R&& r) const
         {
-            constexpr auto set = group_of<std::ranges::range_value_t<R>>();
-            return product(constant<set>, std::forward<R>(r));
+            return product(std::type_identity<std::remove_cvref_t<std::ranges::range_value_t<R>>>{}, std::forward<R>(r));
+        }
+
+        template<typename F>
+        constexpr auto operator()(size_t n, F&& f) const
+        {
+            return (*this)(std::views::iota(0uz, n) | std::views::transform(std::forward<F>(f)));
         }
     };    
 }
@@ -499,6 +516,8 @@ namespace crypto12381
     inline constexpr detail::i_t i{};
 
     inline constexpr auto Σ = sum;
+
+    inline constexpr auto Π = product;
 }
 
 

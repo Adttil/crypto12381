@@ -74,7 +74,7 @@ namespace crypto12381::ps
             throw std::runtime_error{ "message is too long" };
         }
         auto x = parse<Zp>(sk.x);
-        vector y = parse<Zp>(sk.y);
+        auto y = parse<Zp>(sk.y);
 
         auto h = random-select_in<*G1>;
 
@@ -91,14 +91,10 @@ namespace crypto12381::ps
         }
         auto g2 = parse<G2>(pk.g2);
         auto X2 = parse<G2>(pk.X2);
+        auto Y2 = parse<G2>(pk.Y2);
 
         auto [σ1, σ2] = parse<G1, G1>(signature);
-        
-        for(size_t i = 0; i < n; ++i)
-        {
-            X2 = X2 * (parse<G2>(pk.Y2[i]) ^ m[i]);
-        }
 
-        return pair(σ1, X2) == pair(σ2, g2);
+        return pair(σ1, X2 * Π(n, Y2[i] ^ m[i])) == pair(σ2, g2);
     }
 }

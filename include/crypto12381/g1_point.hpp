@@ -70,6 +70,9 @@ namespace crypto12381::detail
             BLS12381::ECP_fromOctet(data_, &buffer_view);
         }
 
+        constexpr G1Point(const G1Point&) = default;
+        constexpr G1Point(G1Point&&) = default;
+
         void serialize(std::span<char, serialized_size<G1>> bytes) const noexcept
         {
             core::octet buffer_view{
@@ -169,6 +172,9 @@ namespace crypto12381::detail
 
     private:
         constexpr G1Point() noexcept = default;
+
+        G1Point& operator=(const G1Point&) = default;
+        G1Point& operator=(G1Point&&) = default;
         
         static G1Point& get_default_generator() noexcept
         {
