@@ -46,10 +46,30 @@ void parse_test()
     }
 }
 
+void hash_test()
+{
+    auto random = create_random_engine("this is a seed");
+    
+    auto [x, y, z] = random-select_in<Zp^3>;
+
+    auto c1 = hash(x, y, z).to(Zp);
+    auto c2 = hash(std::vector{ x, y, z }).to(Zp);
+
+    if(c1 == c2)
+    {
+        std::println("succeed");
+    }
+    else
+    {
+        std::println("failed");
+    }
+}
+
 int main()
 {
     pair_test();
     parse_test();
+    hash_test();
 
     return 0;
 }

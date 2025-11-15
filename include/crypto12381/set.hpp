@@ -257,14 +257,33 @@ namespace crypto12381::detail
 {
     class hash_state
     {
-    friend class hash_fn;
     public:
         static constexpr const int hash_size = 64;
+
         hash_state() noexcept
         {
             core::SHA3_init(&state_, hash_size);
         }
         
+        template<typename T>
+        constexpr hash_state&& operator|(const T& t)&& noexcept
+        {
+            process(t);
+            return std::move(*this);
+        }
+        
+        void to(std::span<char, hash_size> bytes)&& noexcept
+        {
+            core::SHA3_hash(&state_, bytes.data());
+        }
+
+        template<set Set>
+        constexpr auto to(Set) && noexcept
+        {
+            return hash_to(std::move(*this), Set{});
+        }
+
+    private:
         template<size_t N>
         void process(std::span<const char, N> bytes) noexcept
         {
@@ -281,33 +300,20 @@ namespace crypto12381::detail
             {
                 process(std::span{ reinterpret_cast<const char(&)[sizeof(T)]>(t) });
             }
+            else if constexpr(std::ranges::range<const T&>)
+            {
+                for(const auto& e : t)
+                {
+                    process(e);
+                }
+            }
             else
             {
                 serialized_field<group_of<T>()> buffer = serialize(t);
                 process(buffer);
             }
+            
         }
-
-        template<typename T, typename Self>
-        constexpr Self&& operator|(this Self&& self, const T& t) noexcept
-        {
-            self.process(t);
-            return std::forward<Self>(self);
-        }
-        
-        void to(std::span<char, hash_size> bytes)&& noexcept
-        {
-            core::SHA3_hash(&state_, bytes.data());
-        }
-
-        template<set Set>
-        constexpr auto to(Set) && noexcept
-        {
-            return hash_to(std::move(*this), Set{});
-        }
-
-    private:
-        
 
         core::sha3 state_;
     };
@@ -317,8 +323,7 @@ namespace crypto12381::detail
         template<typename...Args>
         constexpr hash_state operator()(Args&&...args) const noexcept
         {
-            hash_state state;
-            return (state | ... | args);
+            return (hash_state{} | ... | args);
         }
 
         template<typename T, typename Self>

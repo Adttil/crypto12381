@@ -2,7 +2,7 @@
 [![license](https://img.shields.io/github/license/Adttil/crypto12381.svg)](https://github.com/Adttil/crypto12381/blob/main/LICENSE.txt)
 [![issues](https://img.shields.io/github/issues/Adttil/crypto12381.svg)](https://github.com/Adttil/crypto12381/issues)
 
-crypto12381 is an esay-to-use cryptographic library based on the elliptic curve BLS12381.
+Crypto12381 is an esay-to-use cryptographic library based on the elliptic curve BLS12-381.
 
 Actually, it is a wrapper for a subset of the library [MIRACL-core](https://github.com/miracl/core), designed to make it easier to use.
 
@@ -128,13 +128,14 @@ In fact, you can just write like this:
 ```cpp
 auto c1 = (hash | x | g1 | g2).to(Zp); // same as (1)
 ```
-This helps to hash a variable number of elements:
+You can also hash a variable number of elements by given a range of the elements:
 ```cpp 
-// hash all element in elements to a number in Zp
-auto hash_state = hash();
-for(const auto& element : elements)
+auto elements = std::vector{ g1, g2 };
+// push variable number of elements
+for(size_t i = 0; i < n; ++i)
 {
-    hash_state | element;
+    elements.push_pack(random-select_in<*G1>);
 }
-auto c = std::move(hash_state).to(Zp);
+// hash x and all elements to a number in Zp
+auto c = hash(x, elements).to(Zp);
 ```

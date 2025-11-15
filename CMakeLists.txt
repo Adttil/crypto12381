@@ -16,6 +16,9 @@ target_include_directories(crypto12381 PUBLIC "include" "3rd-party")
 add_executable(example_ps "example_ps.cpp")
 target_link_libraries(example_ps PRIVATE crypto12381)
 
+add_executable(test "test.cpp")
+target_link_libraries(test PRIVATE crypto12381)
+
 if(CRYPTO12381_INCLUDE_TESTS)
     add_subdirectory(tests)
 endif()
