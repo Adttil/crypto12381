@@ -7,26 +7,45 @@
 
 namespace crypto12381 
 {
-    namespace detail 
+    namespace detail::sets
     {
-        struct Zp_t{};
-        struct G1_t{};
-        struct G2_t{};
+        struct Zp_t
+        {
+            consteval size_t serialized_size() const noexcept
+            {
+                return 48uz;
+            }
+        };
+        struct G1_t
+        {
+            consteval size_t serialized_size() const noexcept
+            {
+                return 48uz + 1uz;
+            }
+        };
+        struct G2_t
+        {
+            consteval size_t serialized_size() const noexcept
+            {
+                return 2uz * 48uz + 1uz;
+            }
+        };
+        struct GT_t
+        {
+            consteval size_t serialized_size() const noexcept
+            {
+                return 12uz * 48uz;
+            }
+        };
     }
 
-    inline constexpr detail::Zp_t Zp{};
-    inline constexpr detail::G1_t G1{};
-    inline constexpr detail::G2_t G2{};
+    inline constexpr detail::sets::Zp_t Zp{};
+    inline constexpr detail::sets::G1_t G1{};
+    inline constexpr detail::sets::G2_t G2{};
+    inline constexpr detail::sets::GT_t GT{};
 
     template<auto Set>
-    inline constexpr size_t serialized_size = serialized_size<Set.base> * Set.exponent;
-
-    template<>
-    inline constexpr size_t serialized_size<Zp> = 48uz;
-    template<>
-    inline constexpr size_t serialized_size<G1> = 48uz + 1uz;
-    template<>
-    inline constexpr size_t serialized_size<G2> = 2uz * 48uz + 1uz;
+    inline constexpr size_t serialized_size = Set.serialized_size();
 
     template<auto...Set>
     using serialized_field = std::array<char, (0uz + ... + serialized_size<Set>)>;
@@ -35,26 +54,30 @@ namespace crypto12381
     using serialized_view = std::span<const char, (0uz + ... + serialized_size<Set>)>;
 }
 
-namespace crypto12381::detail 
+namespace crypto12381::detail::sets
 {
     template<typename Set>
     struct CartesianPower
     {
         Set base;
         size_t exponent;
+
+        constexpr size_t serialized_size() const noexcept
+        {
+            return base.serialized_size() * exponent;
+        }
     };
 
-    constexpr auto operator^(Zp_t, size_t exponent) noexcept
+    template<typename T>
+    constexpr auto operator^(T t, size_t exponent) noexcept
     {
-        return CartesianPower{ Zp, exponent };
+        return CartesianPower{ t, exponent };
     }
-    constexpr auto operator^(G1_t, size_t exponent) noexcept
+
+    template<typename Set>
+    constexpr auto operator^(CartesianPower<Set> power, size_t exponent) noexcept
     {
-        return CartesianPower{ G1, exponent };
-    }
-    constexpr auto operator^(G2_t, size_t exponent) noexcept
-    {
-        return CartesianPower{ G2, exponent };
+        return CartesianPower{ power.base, power.exponent * exponent };
     }
 
     template<typename L, typename R>

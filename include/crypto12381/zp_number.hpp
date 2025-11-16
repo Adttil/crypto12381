@@ -21,31 +21,44 @@ namespace crypto12381
 {
     using chunk_t = std::int64_t;
 
-    static constexpr size_t p_bits = 384;
-    static constexpr size_t p_size = p_bits / std::numeric_limits<unsigned char>::digits;
-
     template<typename T>
     concept Zp_element = element_of<T, Zp>;
 }
 
-namespace crypto12381::detail
+namespace crypto12381::detail 
 {
+    inline constexpr ChunkRange default_range{ 0, 1 };
+
+    template<ChunkRange Head = default_range, ChunkRange RestRange = default_range>
+    class ZpNumber;
+
+    using Zp_normalized_t = ZpNumber<>;
+}
+
+namespace crypto12381::detail::sets 
+{
+    template<typename T>
+    consteval bool contains(constant_t<Zp_t{}>, std::type_identity<T>) noexcept
+    {
+        return std::convertible_to<T, Zp_normalized_t> && requires(T&& t)
+        {
+            t.Zp_number();
+        };
+    }
+    
     struct Zp_except_identity_t{};
     
     constexpr Zp_except_identity_t operator*(Zp_t) noexcept
     {
         return {};
     }
+}
 
-    template<typename T>
-    consteval bool contains(constant_t<Zp_t{}>, std::type_identity<T>) noexcept
-    {
-        return requires(T&& t)
-        {
-            t.Zp_number();
-        };
-    }
-
+namespace crypto12381::detail
+{
+    inline constexpr size_t p_bits = 384;
+    inline constexpr size_t p_size = p_bits / std::numeric_limits<unsigned char>::digits;
+    
     inline constexpr size_t chunke_bits = sizeof(size_t) * std::numeric_limits<unsigned char>::digits;
     inline constexpr size_t base_bits = 58uz;
     inline constexpr chunk_t base_mask = ((chunk_t)1 << (base_bits + 1)) - 1;
@@ -66,13 +79,10 @@ namespace crypto12381::detail
     inline constexpr chunk_t head_max_limit2 = ((chunk_t)1 << (head_bits2 - 1)) - 1;
     inline constexpr chunk_t head_min_limit2 = -head_max_limit2;
 
-    inline constexpr ChunkRange default_range{ 0, 1 };
+    
     inline constexpr ChunkRange rest_range_extrem{ head_min_limit, head_max_limit };
     inline constexpr ChunkRange head_range_extrem{ head_min_limit, head_max_limit };
     inline constexpr ChunkRange head_range_extrem2{ head_min_limit2, head_max_limit2 };
-
-    template<ChunkRange Head = default_range, ChunkRange RestRange = default_range>
-    class ZpNumber;
 
     template<ChunkRange Head = default_range, ChunkRange Rest = default_range>
     class ZpNumber2;
@@ -178,7 +188,6 @@ namespace crypto12381::detail
     class ZpNumber
     {
         friend DataAccessor;
-        friend auto hash_to(hash_state&& state, Zp_t) noexcept;
     public:
         constexpr ZpNumber(unsigned int value) noexcept requires(Rest.contains(default_range))
         : data_{ value } 
@@ -203,7 +212,7 @@ namespace crypto12381::detail
             BLS12381_BIG::BIG_toBytes(bytes.data(), auto{ data_ });
         }
 
-        static constexpr ZpNumber<Head, Rest> select(RandomEngine& random_engine)
+        static constexpr ZpNumber<Head, Rest> select(RandomEngine& random_engine) noexcept
         {
             const auto rng = (core::csprng*)random_engine.impl();
             ZpNumber<Head, Rest> result;
@@ -211,7 +220,7 @@ namespace crypto12381::detail
             return result;
         }
 
-        static constexpr ZpNumber<Head, Rest> select_except0(RandomEngine& random_engine)
+        static constexpr ZpNumber<Head, Rest> select_except0(RandomEngine& random_engine) noexcept
         {
             const auto rng = (core::csprng*)random_engine.impl();
             ZpNumber<Head, Rest> result;
@@ -222,7 +231,14 @@ namespace crypto12381::detail
         }
 
         template<typename Self>
-        constexpr decltype(auto) Zp_number(this Self&& self)
+        requires (not std::same_as<ZpNumber, Zp_normalized_t>)
+        constexpr operator Zp_normalized_t(this Self&& self) noexcept
+        {
+            return std::forward<Self>(self).normalize();
+        }
+
+        template<typename Self>
+        constexpr decltype(auto) Zp_number(this Self&& self) noexcept
         {
             if constexpr(std::is_const_v<std::remove_reference_t<Self>>)
             {
@@ -234,19 +250,19 @@ namespace crypto12381::detail
             }
         }
 
-        constexpr ZpNumber<Head> normalize_rests() const
+        constexpr ZpNumber<Head> normalize_rests() const noexcept
         {
             auto result = data.create<ZpNumber<Head>>();
-            result.data_[0] = 0;
+            data(result)[0] = 0;
             for(size_t i = 0; i < n_chunks - 1; ++i)
             {
-                result.data_[i] += data_[i] & base_mask;
-                result.data_[i + 1] = data_[i] >> base_bits;
+                data(result)[i] += data_[i] & base_mask;
+                data(result)[i + 1] = data_[i] >> base_bits;
             }
             return result;
         }
 
-        constexpr ZpNumber<> normalize() const
+        constexpr ZpNumber<> normalize() const noexcept
         {
             auto result = data.create<ZpNumber<>>();
             auto& x = data(result);
@@ -287,27 +303,32 @@ namespace crypto12381::detail
 
         friend constexpr auto operator-(const ZpNumber& self) noexcept
         {
-            constexpr auto head = ChunkRange{ Head.max - 1, Head.max } - Head;
-            constexpr auto rest = default_range - Rest;
-            if constexpr(not head_range_extrem.contains(head))
-            {
-                return -self.normalize();
-            }
-            else if constexpr(not rest_range_extrem.contains(rest))
-            {
-                return -self.normalize_rests();
-            }
-            else
-            {
-                static constinit auto np = ZpNumber::get_np<Head.max>();
+            auto result = data.create<ZpNumber<>>();
+            BLS12381_BIG::BIG_modneg(data(result), data(self.Zp_number()), p());
+            return result;
 
-                auto result = data.create<ZpNumber<head, rest>>();
-                for(size_t i = 0; i < n_chunks; ++i)
-                {
-                    data(result)[i] = data(np)[i] - self.data_[i];
-                }
-                return result;
-            }
+            // Error in some case
+            // constexpr auto head = ChunkRange{ Head.max - 1, Head.max } - Head;
+            // constexpr auto rest = default_range - Rest;
+            // if constexpr(not head_range_extrem.contains(head))
+            // {
+            //     return -self.normalize();
+            // }
+            // else if constexpr(not rest_range_extrem.contains(rest))
+            // {
+            //     return -self.normalize_rests();
+            // }
+            // else
+            // {
+            //     static constinit auto np = ZpNumber::get_np<Head.max>();
+
+            //     auto result = data.create<ZpNumber<head, rest>>();
+            //     for(size_t i = 0; i < n_chunks; ++i)
+            //     {
+            //         data(result)[i] = data(np)[i] - self.data_[i];
+            //     }
+            //     return result;
+            // }
         }
 
         friend constexpr auto inverse(const ZpNumber& self) noexcept
@@ -394,7 +415,18 @@ namespace crypto12381::detail
         template<ChunkRange RHead, ChunkRange RRest>
         friend constexpr bool operator==(const ZpNumber& l, const ZpNumber<RHead, RRest>& r) noexcept
         {
-            return data(l.normalize()) == data(r.normalize());
+            return BLS12381_BIG::BIG_comp(data(l.normalize()), data(r.normalize())) == 0;
+        }
+
+        static Zp_normalized_t from_hash(hash_state&& state) noexcept
+        requires std::same_as<ZpNumber<>, Zp_normalized_t>
+        {
+            auto hash_bytes = std::move(state).to();
+            BLS12381_BIG::DBIG dbig;
+            BLS12381_BIG::BIG_dfromBytesLen(dbig, hash_bytes.data(), hash_state::hash_size);
+            Zp_normalized_t result;
+            BLS12381_BIG::BIG_ctdmod(result.data_, dbig, p(), hash_state::hash_size * 8 - 255);
+            return result;
         }
 
         template<std::ranges::range R> 
@@ -473,7 +505,7 @@ namespace crypto12381::detail
         ZpNumber& operator=(ZpNumber&&) = default;
 
         template<size_t N>
-        static constexpr ZpNumber<> get_np() noexcept
+        static constexpr auto get_np() noexcept
         {
             return (data.create<ZpNumber<>>(p_data) * constant_t<N>{}).normalize_rests();
         }
@@ -486,19 +518,25 @@ namespace crypto12381::detail
     {
         friend DataAccessor;
     public:
-        constexpr ZpNumber<> Zp_number() const
+        constexpr ZpNumber<> Zp_number() const noexcept
         {
             return normalize();
         }
 
-        constexpr ZpNumber2<Head> normalize_rests() const
+        template<typename Self>
+        constexpr operator Zp_normalized_t(this Self&& self) noexcept
+        {
+            return std::forward<Self>(self).normalize();
+        }
+
+        constexpr ZpNumber2<Head> normalize_rests() const noexcept
         {
             auto result = data.create<ZpNumber2<Head>>();
-            result.data_[0] = 0;
+            data(result)[0] = 0;
             for(size_t i = 0; i < n_chunks2 - 1; ++i)
             {
-                result.data_[i] += data_[i] & base_mask;
-                result.data_[i + 1] = data_[i] >> base_bits;
+                data(result)[i] += data_[i] & base_mask;
+                data(result)[i + 1] = data_[i] >> base_bits;
             }
             return result;
         }
@@ -517,27 +555,33 @@ namespace crypto12381::detail
 
         constexpr auto operator-() const
         {
-            constexpr auto head = ChunkRange{ Head.max - 1, Head.max } - Head;
-            constexpr auto rest = default_range - Rest;
-            if constexpr(not head_range_extrem2.contains(head))
-            {
-                return -normalize();
-            }
-            else if constexpr(not rest_range_extrem.contains(rest))
-            {
-                return -normalize_rests();
-            }
-            else
-            {
-                constexpr auto np2n = get_np2n<Head.max>();
+            auto result = data.create<ZpNumber<>>();
+            BLS12381_BIG::BIG_dmod(data(result), data(Zp_number()), p());
+            BLS12381_BIG::BIG_modneg(data(result), data(result), p());
+            return result;
 
-                auto result = data.create<ZpNumber2<head, rest>>();
-                for(size_t i = 0; i < n_chunks2; ++i)
-                {
-                    data(result)[i] = data(np2n)[i] - data_[i];
-                }
-                return result;
-            }
+            // Error in some case
+            // constexpr auto head = ChunkRange{ Head.max - 1, Head.max } - Head;
+            // constexpr auto rest = default_range - Rest;
+            // if constexpr(not head_range_extrem2.contains(head))
+            // {
+            //     return -normalize();
+            // }
+            // else if constexpr(not rest_range_extrem.contains(rest))
+            // {
+            //     return -normalize_rests();
+            // }
+            // else
+            // {
+            //     constexpr auto np2n = get_np2n<Head.max>();
+
+            //     auto result = data.create<ZpNumber2<head, rest>>();
+            //     for(size_t i = 0; i < n_chunks2; ++i)
+            //     {
+            //         data(result)[i] = data(np2n)[i] - data_[i];
+            //     }
+            //     return result;
+            // }
         }
 
         friend constexpr ZpNumber<> inverse(const ZpNumber2& self) noexcept
@@ -752,14 +796,23 @@ namespace crypto12381::detail
         constexpr ZpNumber2() noexcept = default;
 
         template<size_t N>
-        static consteval ZpNumber2<> get_np2n()
+        static consteval auto get_np2n()
         {
             return (data.create<ZpNumber2<>>(p2n_data) * constant_t<N>{}).normalize_rests();
         }
 
         ZpNumber2Data data_;
     };
+    
+    template<Zp_element T>
+    constexpr void serialize_to(std::span<char, serialized_size<Zp>> bytes, T&& t)
+    {
+        std::forward<T>(t).Zp_number().serialize(bytes);
+    }
+}
 
+namespace crypto12381::detail::sets 
+{
     constexpr auto select_in(constant_t<Zp>, RandomEngine& random) noexcept
     {
         return detail::ZpNumber<>::select(random);
@@ -770,23 +823,11 @@ namespace crypto12381::detail
         return detail::ZpNumber<>::select_except0(random);
     }
 
-    template<typename T>
-    consteval bool contains(constant_t<*Zp>, std::type_identity<T>) noexcept
-    {
-        return false;
-    }
-
     constexpr auto parse(constant_t<Zp>, std::span<const char, serialized_size<Zp>> bytes)
     {
         return detail::ZpNumber<>{ bytes };
     }
 
-    template<Zp_element T>
-    constexpr void serialize_to(std::span<char, serialized_size<Zp>> bytes, T&& t)
-    {
-        std::forward<T>(t).Zp_number().serialize(bytes);
-    }
-    
     constexpr auto encode_to(constant_t<Zp>, std::span<const char> message)
     {
         // size of units splited form message
@@ -817,13 +858,7 @@ namespace crypto12381::detail
 
     inline auto hash_to(hash_state&& state, Zp_t) noexcept
     {
-        char hash_bytes[hash_state::hash_size];
-        std::move(state).to(hash_bytes);
-        BLS12381_BIG::DBIG dbig;
-        BLS12381_BIG::BIG_dfromBytesLen(dbig, hash_bytes, hash_state::hash_size);
-        ZpNumber<> result;
-        BLS12381_BIG::BIG_ctdmod(result.data_, dbig, p(), hash_state::hash_size * 8 - 255);
-        return result;
+        return Zp_normalized_t::from_hash(std::move(state));
     }
 }
 

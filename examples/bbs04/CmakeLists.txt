@@ -3,5 +3,5 @@ cmake_minimum_required (VERSION 3.10)
 include_directories("include")
 
 file(GLOB srcs "src/*.cpp")
-add_executable(ps "test.cpp" ${srcs})
-target_link_libraries(ps PRIVATE crypto12381)
+add_executable(bbs04 "test.cpp" ${srcs})
+target_link_libraries(bbs04 PRIVATE crypto12381)

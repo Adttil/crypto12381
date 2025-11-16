@@ -15,10 +15,19 @@ namespace crypto12381
     }
 
     template<typename T>
-    concept GT_element = requires(T& t)
+    concept GT_element = element_of<T, GT>;
+}
+
+namespace crypto12381::detail::sets
+{
+    template<typename T>
+    consteval bool contains(constant_t<GT_t{}>, std::type_identity<T>) noexcept
     {
-        { t.GT_point() } -> detail::specified<detail::GTPoint>;
-    };
+        return std::convertible_to<T, GTPoint> && requires(T&& t)
+        {
+            { t.GT_point() } -> detail::specified<detail::GTPoint>;
+        };
+    }
 }
 
 namespace crypto12381::detail
@@ -44,6 +53,16 @@ namespace crypto12381::detail
         constexpr GTPoint(const GTPoint&) = default;
         constexpr GTPoint(GTPoint&&) = default;
 
+        void serialize(std::span<char, serialized_size<GT>> bytes) const noexcept
+        {
+            core::octet buffer_view{
+                .len = 0,
+                .max = serialized_size<GT>,
+                .val = bytes.data()
+            };
+            BLS12381::FP12_toOctet(&buffer_view, auto{ data_ });
+        }
+
         template<typename Self>
         constexpr decltype(auto) GT_point(this Self&& self) noexcept
         {
@@ -55,6 +74,11 @@ namespace crypto12381::detail
             {
                 return std::forward<Self>(self);
             }
+        }
+
+        void show() const
+        {
+            BLS12381::FP12_output(data(GT_point()));
         }
 
         template<GT_element Self>
@@ -139,6 +163,8 @@ namespace crypto12381::detail
     class GTPair
     {
         friend DataAccessor;
+        template<typename, typename>
+        friend class GTPair;
     public:
         template<G1_element P1_, G2_element P2_>
         friend constexpr GTPair<P1_, P2_> pair(P1_&& p1, P2_&& p2) noexcept;
@@ -160,6 +186,11 @@ namespace crypto12381::detail
             );
             BLS12381::PAIR_fexp(data(result));
             return result;
+        }
+
+        void show() const
+        {
+            BLS12381::FP12_output(data(GT_point()));
         }
 
         template<specified<GTPair> L, GT_element R> requires (not specified<R, GTPoint>)
@@ -212,6 +243,12 @@ namespace crypto12381::detail
     constexpr GTPair<P1, P2> pair(P1&& p1, P2&& p2) noexcept
     {
         return GTPair<P1, P2>{ std::forward<P1>(p1), std::forward<P2>(p2) };
+    }
+
+    template<GT_element T>
+    constexpr void serialize_to(std::span<char, serialized_size<GT>> bytes, T&& t)
+    {
+        std::forward<T>(t).GT_point().serialize(bytes);
     }
 }
 

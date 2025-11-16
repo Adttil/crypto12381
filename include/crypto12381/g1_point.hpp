@@ -21,7 +21,7 @@ namespace crypto12381
     concept G1_element = element_of<T, G1>;
 }
 
-namespace crypto12381::detail
+namespace crypto12381::detail::sets 
 {
     struct G1_except_identity_t{};
     
@@ -33,12 +33,15 @@ namespace crypto12381::detail
     template<typename T>
     consteval bool contains(constant_t<G1_t{}>, std::type_identity<T>) noexcept
     {
-        return requires(T&& t)
+        return std::convertible_to<T, G1Point> && requires(T&& t)
         {
             { t.G1_point() } -> detail::specified<detail::G1Point>;
         };
     }
+}
 
+namespace crypto12381::detail
+{
     template<typename T>
     concept g1_reusable = std::is_object_v<decltype(std::declval<T>().G1_point())> || 
             std::is_rvalue_reference_v<decltype(std::declval<T>().G1_point())>;
@@ -53,10 +56,25 @@ namespace crypto12381::detail
         }
     };
 
+    inline constexpr ZpNumberData modulus_data = {
+        0x1FEFFFFFFFFAAABL,
+        0x2FFFFAC54FFFFEEL,
+        0x12A0F6B0F6241EAL,
+        0x213CE144AFD9CC3L,
+        0x2434BACD764774BL,
+        0x25FF9A692C6E9EDL,
+        0x1A0111EA3L
+    };
+
+    constexpr ZpNumberData& modulus() noexcept
+    {
+        thread_local constinit auto modulus = modulus_data;
+        return modulus;
+    }
+
     class G1Point
     {
         friend DataAccessor;
-        friend auto hash_to(hash_state&& state, G1_t) noexcept;
     public:
         constexpr explicit G1Point(serialized_view<G1> bytes)
         {
@@ -94,6 +112,11 @@ namespace crypto12381::detail
             {
                 return std::forward<Self>(self);
             }
+        }
+
+        void show() const
+        {
+            BLS12381::ECP_output(data(G1_point()));
         }
 
         static const G1Point& default_generator() noexcept
@@ -170,6 +193,23 @@ namespace crypto12381::detail
             return BLS12381::ECP_equals(data(l.G1_point()), data(r.G1_point())) == 1;
         }
 
+        static G1Point from_hash(hash_state&& state) noexcept
+        {
+            char hash_bytes[hash_state::hash_size];
+            std::move(state).to(hash_bytes);
+            BLS12381_BIG::DBIG dbig;
+            BLS12381_BIG::BIG_dfromBytesLen(dbig, hash_bytes, hash_state::hash_size);
+            BLS12381_BIG::BIG x;
+            BLS12381_BIG::BIG_ctdmod(x, dbig, modulus(), hash_state::hash_size * 8 - 381);
+            BLS12381_FP::FP fp;
+            BLS12381_FP::FP_nres(&fp, x);
+
+            G1Point result;
+            BLS12381::ECP_map2point(result.data_, &fp);
+            BLS12381::ECP_cfp(result.data_);
+            return result;
+        }
+
     private:
         constexpr G1Point() noexcept = default;
 
@@ -196,8 +236,8 @@ namespace crypto12381::detail
     {
         friend G1Point;
         friend DataAccessor;
-        friend constexpr auto select_in(constant_t<G1>, RandomEngine& random) noexcept;
-        friend constexpr auto select_in(constant_t<*G1>, RandomEngine& random) noexcept;
+        template<typename, typename>
+        friend class G1Pow;
     public:
         G1Pow() = delete;
         
@@ -227,6 +267,11 @@ namespace crypto12381::detail
                 BLS12381::PAIR_G1mul(data(result), data(std::forward<Self>(self).number().Zp_number()));
                 return result;
             }
+        }
+
+        void show() const
+        {
+            BLS12381::ECP_output(data(G1_point()));
         }
 
         template<specified<G1Pow> L, G1_element R> requires (not specified<R, G1Point>)
@@ -266,6 +311,22 @@ namespace crypto12381::detail
                 return result;
             }
         }
+
+        static auto select(RandomEngine& random) noexcept
+        {
+            return G1Pow<G1Point&, ZpNumber<>>{ 
+                const_cast<detail::G1Point&>(detail::G1Point::default_generator()), 
+                crypto12381::select_in<Zp>(random) 
+            };
+        }
+
+        static auto select_except1(RandomEngine& random) noexcept
+        {
+            return G1Pow<G1Point&, ZpNumber<>>{ 
+                const_cast<detail::G1Point&>(detail::G1Point::default_generator()), 
+                crypto12381::select_in<*Zp>(random) 
+            };
+        }
     private:
         constexpr explicit G1Pow(P&& point, V&& number) noexcept
         : data_{ std::forward<P>(point), std::forward<V>(number) }
@@ -286,26 +347,23 @@ namespace crypto12381::detail
         std::tuple<P, V> data_;
     };
 
+    template<G1_element T>
+    constexpr void serialize_to(std::span<char, serialized_size<G1>> bytes, T&& t)
+    {
+        std::forward<T>(t).G1_point().serialize(bytes);
+    }
+}
+
+namespace crypto12381::detail::sets 
+{
     constexpr auto select_in(constant_t<G1>, RandomEngine& random) noexcept
     {
-        return G1Pow<G1Point&, ZpNumber<>>{ 
-            const_cast<detail::G1Point&>(detail::G1Point::default_generator()), 
-            crypto12381::select_in<Zp>(random) 
-        };
+        return G1Pow<G1Point&, ZpNumber<>>::select(random);
     }
 
     constexpr auto select_in(constant_t<*G1>, RandomEngine& random) noexcept
     {
-        return G1Pow<G1Point&, ZpNumber<>>{ 
-            const_cast<detail::G1Point&>(detail::G1Point::default_generator()), 
-            crypto12381::select_in<*Zp>(random) 
-        };
-    }
-
-    template<typename T>
-    consteval bool contains(constant_t<*G1>, std::type_identity<T>) noexcept
-    {
-        return false;
+        return G1Pow<G1Point&, ZpNumber<>>::select_except1(random);
     }
 
     constexpr auto parse(constant_t<G1>, serialized_view<G1> bytes)
@@ -313,43 +371,9 @@ namespace crypto12381::detail
         return detail::G1Point{ bytes };
     }
 
-    template<G1_element T>
-    constexpr void serialize_to(std::span<char, serialized_size<G1>> bytes, T&& t)
-    {
-        std::forward<T>(t).G1_point().serialize(bytes);
-    }
-
-    inline constexpr ZpNumberData modulus_data = {
-        0x1FEFFFFFFFFAAABL,
-        0x2FFFFAC54FFFFEEL,
-        0x12A0F6B0F6241EAL,
-        0x213CE144AFD9CC3L,
-        0x2434BACD764774BL,
-        0x25FF9A692C6E9EDL,
-        0x1A0111EA3L
-    };
-
-    constexpr ZpNumberData& modulus() noexcept
-    {
-        thread_local constinit auto modulus = modulus_data;
-        return modulus;
-    }
-
     inline auto hash_to(hash_state&& state, G1_t) noexcept
     {
-        char hash_bytes[hash_state::hash_size];
-        std::move(state).to(hash_bytes);
-        BLS12381_BIG::DBIG dbig;
-        BLS12381_BIG::BIG_dfromBytesLen(dbig, hash_bytes, hash_state::hash_size);
-        BLS12381_BIG::BIG x;
-        BLS12381_BIG::BIG_ctdmod(x, dbig, modulus(), hash_state::hash_size * 8 - 381);
-        BLS12381_FP::FP fp;
-        BLS12381_FP::FP_nres(&fp, x);
-
-        G1Point result;
-        BLS12381::ECP_map2point(result.data_, &fp);
-        BLS12381::ECP_cfp(result.data_);
-        return result;
+        return G1Point::from_hash(std::move(state));
     }
 }
 

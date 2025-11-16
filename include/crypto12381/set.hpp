@@ -1,6 +1,8 @@
 #ifndef CRYPTO12381_SET_HPP
 #define CRYPTO12381_SET_HPP
 
+#include <print>
+
 #include <tuple>
 #include <type_traits>
 #include <ranges>
@@ -96,8 +98,6 @@ namespace crypto12381
 
     template<typename R>
     vector(R&& r) -> vector<std::views::all_t<R>>;
-
-    
 }
 
 template <class R>
@@ -106,13 +106,19 @@ constexpr bool std::ranges::enable_borrowed_range<crypto12381::vector<R>> = std:
 namespace crypto12381
 {
     template<typename T>
-    concept set = requires(RandomEngine& random) 
+    concept selectable = requires(const T& t, RandomEngine& random) 
     {
         select_in(constant<std::remove_cvref_t<T>{}>, random);
-        { contains(
-            constant<std::remove_cvref_t<T>{}>, 
-            std::type_identity<std::remove_cvref_t<decltype(select_in(constant<std::remove_cvref_t<T>{}>, random))>>{}
-        ) } -> std::same_as<bool>;
+        // { contains(
+        //     constant<std::remove_cvref_t<T>{}>, 
+        //     std::type_identity<std::remove_cvref_t<decltype(select_in(constant<std::remove_cvref_t<T>{}>, random))>>{}
+        // ) } -> std::same_as<bool>;
+    };
+
+    template<typename T>
+    concept parseable = requires(serialized_view<std::remove_cvref_t<T>{}> bytes) 
+    {
+        parse(constant<std::remove_cvref_t<T>{}>, bytes);
     };
 
     template<typename T, auto Set>
@@ -130,13 +136,13 @@ namespace crypto12381
         struct encode_to_fn;
     }
 
-    template<set auto Set>
+    template<auto Set>
     inline constexpr detail::select_in_fn<Set> select_in{};
 
-    template<set auto...Set>
+    template<auto...Set>
     inline constexpr detail::parse_fn<Set...> parse{};
 
-    template<set auto Set>
+    template<auto Set>
     inline constexpr detail::encode_to_fn<Set> encode_to{};
 }
 
@@ -275,6 +281,10 @@ namespace crypto12381::detail
         {
             return G2;
         }
+        else if constexpr(element_of<T, GT>)
+        {
+            return GT;
+        }
     }
 
     template<typename...Args>
@@ -305,6 +315,14 @@ namespace crypto12381::detail
             }(std::make_index_sequence<sizeof...(Args)>{});
         }
 
+        template<typename Self>
+        constexpr std::array<char, byte_count> to(this Self&& self) noexcept
+        {
+            std::array<char, byte_count> result;
+            std::forward<Self>(self).to(result);
+            return result;
+        }
+
         template<typename T, typename Self>
         requires (std::is_trivially_copyable_v<T> && sizeof(T) == byte_count)
         constexpr void to(this Self&& self, T& t) noexcept
@@ -328,49 +346,6 @@ namespace crypto12381::detail
             return std::forward<Self>(self).template to<T>();
         }
     };
-
-    constexpr auto operator^(const set auto& base, size_t exponent) noexcept
-    {
-        return CartesianPower{ base, exponent };
-    }
-
-    template<CartesianPower Set>
-    constexpr auto select_in(constant_t<Set>, RandomEngine& random) noexcept
-    {
-        if constexpr(Set.exponent == 1)
-        {
-            return select_in(constant<Set.base>, random);
-        }
-        else return [&]<size_t...I>(std::index_sequence<I...>){
-            return std::tuple{
-                random-crypto12381::select_in<Set.base^(1 + (I - I))>...
-            };
-        }(std::make_index_sequence<Set.exponent>{});
-    }
-
-    template<CartesianPower Set, typename T>
-    consteval bool contains(constant_t<Set>, std::type_identity<T>) noexcept
-    {
-        if constexpr(Set.exponent == 1)
-        {
-            return contains(constant<Set.base>, std::type_identity<T>{});
-        }
-        else return [&]<size_t...I>(std::index_sequence<I...>){
-            return (true && ... && contains((I - I, constant<Set.base>), std::type_identity<std::tuple_element_t<I, T>>{}));
-        }(std::make_index_sequence<Set.exponent>{});
-    }
-
-    template<CartesianPower Set>
-    constexpr auto parse(constant_t<Set>, std::span<const char, serialized_size<Set.base> * Set.exponent> bytes)
-    {
-        if constexpr(Set.exponent == 1)
-        {
-            return crypto12381::parse<Set.base>(bytes);
-        }
-        else return [&]<size_t...I>(std::index_sequence<I...>){
-            return crypto12381::parse<CartesianPower{ Set.base, 1uz + (I - I) }...>(bytes);
-        }(std::make_index_sequence<Set.exponent>{});
-    }
 }
 
 namespace crypto12381
@@ -414,8 +389,16 @@ namespace crypto12381::detail
             core::SHA3_hash(&state_, bytes.data());
         }
 
-        template<set Set>
+        auto to()&& noexcept
+        {
+            std::array<char, hash_size> buffer;
+            std::move(*this).to(buffer);
+            return buffer;
+        }
+
+        template<typename Set>
         constexpr auto to(Set) && noexcept
+        requires requires{hash_to(std::move(*this), Set{});}
         {
             return hash_to(std::move(*this), Set{});
         }
@@ -433,7 +416,12 @@ namespace crypto12381::detail
         template<typename T>
         void process(const T& t) noexcept
         {
-            if constexpr(std::is_trivially_copyable_v<T>)
+            if constexpr(not std::same_as<decltype(group_of<T>()), void>)
+            {
+                serialized_field<group_of<T>()> buffer = serialize(t);
+                process(buffer);
+            }
+            else if constexpr(std::is_trivially_copyable_v<T>)
             {
                 process(std::span{ reinterpret_cast<const char(&)[sizeof(T)]>(t) });
             }
@@ -446,10 +434,8 @@ namespace crypto12381::detail
             }
             else
             {
-                serialized_field<group_of<T>()> buffer = serialize(t);
-                process(buffer);
+                static_assert(false, "can not hash T");
             }
-            
         }
 
         core::sha3 state_;
@@ -460,7 +446,7 @@ namespace crypto12381::detail
         template<typename...Args>
         constexpr hash_state operator()(Args&&...args) const noexcept
         {
-            return (hash_state{} | ... | args);
+            return (hash_state{} | ... | std::forward<Args>(args));
         }
 
         template<typename T, typename Self>
@@ -520,6 +506,45 @@ namespace crypto12381
     inline constexpr auto Π = product;
 }
 
+namespace crypto12381::detail::sets 
+{
+    template<CartesianPower Set>
+    constexpr auto select_in(constant_t<Set>, RandomEngine& random) noexcept
+    {
+        if constexpr(Set.exponent == 1)
+        {
+            return select_in(constant<Set.base>, random);
+        }
+        else return [&]<size_t...I>(std::index_sequence<I...>){
+            return std::tuple{
+                random-crypto12381::select_in<Set.base^(1 + (I - I))>...
+            };
+        }(std::make_index_sequence<Set.exponent>{});
+    }
 
+    // template<CartesianPower Set, typename T>
+    // consteval bool contains(constant_t<Set>, std::type_identity<T>) noexcept
+    // {
+    //     if constexpr(Set.exponent == 1)
+    //     {
+    //         return contains(constant<Set.base>, std::type_identity<T>{});
+    //     }
+    //     else return [&]<size_t...I>(std::index_sequence<I...>){
+    //         return (true && ... && contains((I - I, constant<Set.base>), std::type_identity<std::tuple_element_t<I, T>>{}));
+    //     }(std::make_index_sequence<Set.exponent>{});
+    // }
+
+    template<CartesianPower Set>
+    constexpr auto parse(constant_t<Set>, std::span<const char, serialized_size<Set.base> * Set.exponent> bytes)
+    {
+        if constexpr(Set.exponent == 1)
+        {
+            return crypto12381::parse<Set.base>(bytes);
+        }
+        else return [&]<size_t...I>(std::index_sequence<I...>){
+            return crypto12381::parse<CartesianPower{ Set.base, 1uz + (I - I) }...>(bytes);
+        }(std::make_index_sequence<Set.exponent>{});
+    }
+}
 
 #endif

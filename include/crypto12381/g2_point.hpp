@@ -21,7 +21,7 @@ namespace crypto12381
     concept G2_element = element_of<T, G2>;
 }
 
-namespace crypto12381::detail
+namespace crypto12381::detail::sets
 {
     struct G2_except_identity_t{};
     
@@ -33,12 +33,15 @@ namespace crypto12381::detail
     template<typename T>
     consteval bool contains(constant_t<G2>, std::type_identity<T>) noexcept
     {
-        return requires(T&& t)
+        return std::convertible_to<T, G2Point> && requires(T&& t)
         {
             { t.G2_point() } -> detail::specified<detail::G2Point>;
         };
     }
+}
 
+namespace crypto12381::detail
+{
     template<typename T>
     concept g2_reusable = std::is_object_v<decltype(std::declval<T>().G2_point())> || 
             std::is_rvalue_reference_v<decltype(std::declval<T>().G2_point())>;
@@ -229,7 +232,16 @@ namespace crypto12381::detail
 
         G2PointData data_;
     };
+    
+    template<G2_element T>
+    constexpr void serialize_to(std::span<char, serialized_size<G2>> bytes, T&& t)
+    {
+        std::forward<T>(t).G2_point().serialize(bytes);
+    }
+}
 
+namespace crypto12381::detail::sets 
+{
     constexpr auto select_in(constant_t<G2>, RandomEngine& random) noexcept
     {
         return G2Point::select(random);
@@ -240,21 +252,9 @@ namespace crypto12381::detail
         return G2Point::select_except1(random);
     }
 
-    template<typename T>
-    consteval bool contains(constant_t<*G2>, std::type_identity<T>) noexcept
-    {
-        return false;
-    }
-
     constexpr auto parse(constant_t<G2>, serialized_view<G2> bytes)
     {
         return detail::G2Point{ bytes };
-    }
-
-    template<G2_element T>
-    constexpr void serialize_to(std::span<char, serialized_size<G2>> bytes, T&& t)
-    {
-        std::forward<T>(t).G2_point().serialize(bytes);
     }
 }
 
