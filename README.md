@@ -35,7 +35,7 @@ void pair_test()
 ```
 Using it feels like you're directly mirroring the formulas from the academic papers.
 
-You can just read a signature example in [`example_ps.cpp`](example_ps.cpp).
+You can just read a simple signature example in [`example_ps.cpp`](example_ps.cpp).
 
 # Random
 You can create a random engine to select elements in groups.
@@ -60,6 +60,26 @@ sum(elements);// sum all element in elements
 sum(elements.size(), elements[i]);// same as above
 sum(n, y[i] * m[i]);// sum (y[i] * m[i]) for i in [0, n)
 Σ(n, y[i] * m[i]);// same as above
+```
+
+# Hash
+You can hash multiple elements to a number or a point:
+```cpp
+auto c1 = hash(x, g1, g2).to(Zp); // (1) hash to a number in Zp
+auto c2 = hash(x, g1, g2).to(G1); // (2) hash to a point in G1
+```
+You can also append more elements after call hash
+```cpp
+auto c1 = (hash(x) | g1 | g2).to(Zp); // same as (1)
+```
+In fact, you can just write like this:
+```cpp
+auto c1 = (hash | x | g1 | g2).to(Zp); // same as (1)
+```
+You can also hash a variable number of elements by given a range of the elements:
+```cpp 
+// hash x and all element in elements to a number in Zp
+auto c = hash(x, elements).to(Zp);
 ```
 
 # Serialize
@@ -120,31 +140,22 @@ serialize(x, g1, g2).to(pack.data);
 # Parse
 For all the definition of `struct Pack` above, you can parse the `pack` by:
 ```cpp
-auto[x, g1, g2] = parse<Zp, G1, G1>(pack);
+auto [x, g1, g2] = parse<Zp, G1, G1>(pack);
 ```
-
-# Hash
-You can hash multiple elements to a number or a point:
+or
 ```cpp
-auto c1 = hash(x, g1, g2).to(Zp); // (1) hash to a number in Zp
-auto c2 = hash(x, g1, g2).to(G1); // (2) hash to a point in G1
+auto [x, g] = parse<Zp, G1^2>(pack);
+auto&& [g1, g2] = g;
 ```
-You can also append more elements after call hash
+or
 ```cpp
-auto c1 = (hash(x) | g1 | g2).to(Zp); // same as (1)
+auto [x, g1, g2] = parse<Zp | G1^2>(pack);
 ```
-In fact, you can just write like this:
+If you have a range of Pack `packs`, you can parse it and iterate results like this:
 ```cpp
-auto c1 = (hash | x | g1 | g2).to(Zp); // same as (1)
-```
-You can also hash a variable number of elements by given a range of the elements:
-```cpp 
-auto elements = std::vector{ g1, g2 };
-// push variable number of elements
-for(size_t i = 0; i < n; ++i)
+auto parsed_packs = parse<Zp | G1^2>(packs);
+for(auto&&[x, g1, g2] : parsed_packs)
 {
-    elements.push_pack(random-select_in<*G1>);
+    visit(x, g1, g2);
 }
-// hash x and all elements to a number in Zp
-auto c = hash(x, elements).to(Zp);
 ```
