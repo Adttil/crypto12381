@@ -57,7 +57,7 @@ namespace crypto12381
 namespace crypto12381::detail::sets
 {
     template<typename Set>
-    struct CartesianPower
+    struct cartesian_power
     {
         Set base;
         size_t exponent;
@@ -71,13 +71,13 @@ namespace crypto12381::detail::sets
     template<typename T>
     constexpr auto operator^(T t, size_t exponent) noexcept
     {
-        return CartesianPower{ t, exponent };
+        return cartesian_power{ t, exponent };
     }
 
     template<typename Set>
-    constexpr auto operator^(CartesianPower<Set> power, size_t exponent) noexcept
+    constexpr auto operator^(cartesian_power<Set> power, size_t exponent) noexcept
     {
-        return CartesianPower{ power.base, power.exponent * exponent };
+        return cartesian_power{ power.base, power.exponent * exponent };
     }
 
     template<typename L, typename R>

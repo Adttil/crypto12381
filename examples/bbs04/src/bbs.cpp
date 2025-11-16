@@ -29,7 +29,7 @@ namespace crypto12381::bbs04
 
     Signature sign(const GroupPublicKey& gpk, const GroupMemberPrivateKey& gsk, std::span<const char> message, RandomEngine& random) noexcept
     {
-        auto [g1, g2, h, u, v, w] = parse<G1, G2, G1, G1, G1, G2>(gpk);
+        auto [g1, g2, h, u, v, w] = parse<G1 | G2 | G1^3 | G2>(gpk);
         auto [A, x] = parse<G1, Zp>(gsk);
 
         auto [α, β, rα, rβ, rx, rδ1, rδ2] = random-select_in<Zp^7>;
@@ -58,8 +58,8 @@ namespace crypto12381::bbs04
 
     bool verify(const GroupPublicKey& gpk, std::span<const char> message, const Signature& signature) noexcept
     {
-        auto [g1, g2, h, u, v, w] = parse<G1, G2, G1, G1, G1, G2>(gpk);
-        auto [T1, T2, T3, c, sα, sβ, sx, sδ1, sδ2] = parse<G1, G1, G1, Zp, Zp, Zp, Zp, Zp, Zp>(signature);
+        auto [g1, g2, h, u, v, w] = parse<G1 | G2 | G1^3 | G2>(gpk);
+        auto [T1, T2, T3, c, sα, sβ, sx, sδ1, sδ2] = parse<G1^3 | Zp^6>(signature);
 
         auto neg_c = -c;
         auto neg_sδ1 = -sδ1;
@@ -77,7 +77,7 @@ namespace crypto12381::bbs04
 
     serialized_field<G1> open(const GroupManagerPrivateKey& gmsk, const Signature& signature) noexcept
     {
-        auto [T1, T2, T3, c, sα, sβ, sx, sδ1, sδ2] = parse<G1, G1, G1, Zp, Zp, Zp, Zp, Zp, Zp>(signature);
+        auto [T1, T2, T3, c, sα, sβ, sx, sδ1, sδ2] = parse<G1^3 | Zp^6>(signature);
         auto&& [ξ1, ξ2] = parse<Zp^2>(gmsk);
         auto a = T3 / ((T1^ξ1) * (T2^ξ2));
 

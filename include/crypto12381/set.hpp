@@ -16,6 +16,14 @@
 
 namespace crypto12381::detail
 {
+    template<typename L, typename R>
+    constexpr auto pow(L&& l, R&& r)
+    noexcept(noexcept(std::forward<L>(l) ^ std::forward<R>(r)))
+    requires requires{std::forward<L>(l) ^ std::forward<R>(r);}
+    {
+        return std::forward<L>(l) ^ std::forward<R>(r);
+    }
+
     template<typename F>
     struct indexer_fn : F
     {
@@ -508,7 +516,7 @@ namespace crypto12381
 
 namespace crypto12381::detail::sets 
 {
-    template<CartesianPower Set>
+    template<cartesian_power Set>
     constexpr auto select_in(constant_t<Set>, RandomEngine& random) noexcept
     {
         if constexpr(Set.exponent == 1)
@@ -522,7 +530,7 @@ namespace crypto12381::detail::sets
         }(std::make_index_sequence<Set.exponent>{});
     }
 
-    // template<CartesianPower Set, typename T>
+    // template<cartesian_power Set, typename T>
     // consteval bool contains(constant_t<Set>, std::type_identity<T>) noexcept
     // {
     //     if constexpr(Set.exponent == 1)
@@ -534,16 +542,49 @@ namespace crypto12381::detail::sets
     //     }(std::make_index_sequence<Set.exponent>{});
     // }
 
-    template<CartesianPower Set>
-    constexpr auto parse(constant_t<Set>, std::span<const char, serialized_size<Set.base> * Set.exponent> bytes)
+    template<cartesian_power Set>
+    constexpr auto parse(constant_t<Set>, serialized_view<Set> bytes)
     {
         if constexpr(Set.exponent == 1)
         {
             return crypto12381::parse<Set.base>(bytes);
         }
         else return [&]<size_t...I>(std::index_sequence<I...>){
-            return crypto12381::parse<CartesianPower{ Set.base, 1uz + (I - I) }...>(bytes);
+            return crypto12381::parse<cartesian_power{ Set.base, 1uz + (I - I) }...>(bytes);
         }(std::make_index_sequence<Set.exponent>{});
+    }
+
+    template<typename L, typename R>
+    struct cartesian_product
+    {
+        L l;
+        R r;
+
+        constexpr size_t serialized_size() const noexcept
+        {
+            return l.serialized_size() + r.serialized_size();
+        }
+    };
+
+    template<typename L, typename R>
+    constexpr auto operator*(L l, R r) noexcept
+    {
+        return cartesian_product{ l, r };
+    }
+
+    template<typename L, typename R>
+    constexpr auto operator|(L l, R r) noexcept
+    {
+        return cartesian_product{ l, r };
+    }
+
+    template<cartesian_product Set>
+    constexpr auto parse(constant_t<Set>, serialized_view<Set> bytes)
+    {
+        return std::tuple_cat(
+            std::tuple{ crypto12381::parse<Set.l>(bytes.template subspan<0uz, serialized_size<Set.l>>()) },
+            std::tuple{ crypto12381::parse<Set.r>(bytes.template subspan<serialized_size<Set.l>, serialized_size<Set.r>>()) }
+        );
     }
 }
 
