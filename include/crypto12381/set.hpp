@@ -232,6 +232,12 @@ namespace crypto12381::detail
             }
         }
 
+        template<typename T>
+        constexpr auto operator()(std::reference_wrapper<T> t) const
+        {
+            return (*this)(t.get());
+        }
+
         // constexpr auto operator()(std::span<const char, bytes_size> bytes) const
         // {
         //     if constexpr(sizeof...(Set) == 1uz)

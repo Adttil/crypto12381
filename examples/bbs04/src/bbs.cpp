@@ -14,16 +14,18 @@ namespace crypto12381::bbs04
         
         auto w = g2^γ;
 
+        auto gsk = std::vector<GroupMemberPrivateKey>(n);
+        for(size_t i = 0; i < n; ++i)
+        {
+            auto xi = random-select_in<*Zp>;
+            auto Ai = g1^inverse(γ + xi);
+            gsk[i] = serialize(Ai, xi);
+        }
+
         return {
             .gpk = serialize(g1, g2, h, u, v, w),
             .gmsk = serialize(ξ1, ξ2),
-            .gsk = std::views::iota(0uz, n)
-                | std::views::transform([&](auto) -> GroupMemberPrivateKey {
-                    auto x = random-select_in<*Zp>;
-                    auto A = g1^inverse(γ + x);
-                    return serialize(A, x);
-                })
-                | std::ranges::to<std::vector>()
+            .gsk = gsk
         };
     }
 

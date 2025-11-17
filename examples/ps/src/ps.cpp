@@ -97,4 +97,51 @@ namespace crypto12381::ps
 
         return pair(σ1, X2 * Π(n, Y2[i] ^ m[i])) == pair(σ2, g2);
     }
+
+    As As::setup(RandomEngine& random)
+    {
+        auto g1 = random-select_in<*G1>;
+        auto g2 = random-select_in<*G2>;
+        auto x = random-select_in<*Zp>;
+        auto X1 = g1^x;
+        auto X2 = g2^x;
+
+        return { .pp = serialize(g1, X1, g2, X2) };
+    }
+
+    As::Keys As::key_gen(RandomEngine& random) const
+    {
+        auto [g1, X1, g2, X2] = parse<G1^2 | G2^2>(pp);
+
+        auto y = random-select_in<Zp>;
+        auto Y2 = g2^y;
+
+        return {
+            .sk = serialize(y),
+            .pk = serialize(Y2)
+        };
+    }
+    
+    Signature As::sign_no_check(const PrivateKey& sk, std::span<const char> message, const Signature& signature, RandomEngine& random) const
+    {
+        auto m = hash(message).to(Zp);
+        auto [g1, X1, g2, X2] = parse<G1^2 | G2^2>(pp);
+        auto y = parse<Zp>(sk);
+        auto [σ1, σ2] = parse<G1^2>(signature);
+
+        auto t = random-select_in<Zp>;
+
+        return serialize(σ1^t, (σ2 * pow(σ1, y * m))^t);
+    }
+
+    bool As::verify_impl(std::span<std::reference_wrapper<const PublicKey>> pks, std::span<std::span<const char>> messages, const Signature& signature) const
+    {
+        auto [g1, X1, g2, X2] = parse<G1^2 | G2^2>(pp);
+        auto Y2 = parse<G2>(pks);
+        vector m = messages | std::views::transform([](auto m){ return hash(m).to(Zp); });
+        auto [σ1, σ2] = parse<G1^2>(signature);
+        size_t r = m.size();
+
+        return pair(σ1, X2 * Π(r, Y2[i]^m[i])) == pair(σ2, g2);
+    }
 }
