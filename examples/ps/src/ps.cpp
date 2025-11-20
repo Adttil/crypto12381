@@ -78,7 +78,7 @@ namespace crypto12381::ps
 
         auto h = random-select_in<*G1>;
 
-        return serialize(h, h^(x + Σ(n, y[i] * m[i])));
+        return serialize(h, h^(x + Σ[n](y[i] * m[i])));
     };
 
     bool verify(const PublicKeyN& pk, std::span<const char> message, const Signature& signature)
@@ -95,7 +95,7 @@ namespace crypto12381::ps
 
         auto [σ1, σ2] = parse<G1, G1>(signature);
 
-        return pair(σ1, X2 * Π(n, Y2[i] ^ m[i])) == pair(σ2, g2);
+        return pair(σ1, X2 * Π[n](Y2[i] ^ m[i])) == pair(σ2, g2);
     }
 
     As As::setup(RandomEngine& random)
@@ -138,10 +138,10 @@ namespace crypto12381::ps
     {
         auto [g1, X1, g2, X2] = parse<G1^2 | G2^2>(pp);
         auto Y2 = parse<G2>(pks);
-        vector m = messages | std::views::transform([](auto m){ return hash(m).to(Zp); });
+        auto r = messages.size();
+        auto m = hash(messages|i).to(Zp) [i.in[r]];        
         auto [σ1, σ2] = parse<G1^2>(signature);
-        size_t r = m.size();
 
-        return pair(σ1, X2 * Π(r, Y2[i]^m[i])) == pair(σ2, g2);
+        return pair(σ1, X2 * Π[r](Y2[i]^m[i])) == pair(σ2, g2);
     }
 }

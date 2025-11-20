@@ -13,103 +13,7 @@
 #include "random.hpp"
 #include "constant.hpp"
 #include "interface.hpp"
-
-namespace crypto12381::detail
-{
-    template<typename L, typename R>
-    constexpr auto pow(L&& l, R&& r)
-    noexcept(noexcept(std::forward<L>(l) ^ std::forward<R>(r)))
-    requires requires{std::forward<L>(l) ^ std::forward<R>(r);}
-    {
-        return std::forward<L>(l) ^ std::forward<R>(r);
-    }
-
-    template<typename F>
-    struct indexer_fn : F
-    {
-        template<specified<indexer_fn> L, typename R>
-        friend auto operator*(L&& l, R&& r)
-        {
-            return detail::indexer_fn{
-                [l_r = std::tuple<L, R>{ std::forward<L>(l), std::forward<R>(r) }]<typename C>(this C&& sself, size_t i)
-                {
-                    auto&&[l, r] = std::forward_like<C>(l_r);
-                    return l(i) * r(i);
-                }
-            };
-        }
-
-        template<specified<indexer_fn> L, typename R>
-        friend auto operator^(L&& l, R&& r)
-        {
-            return detail::indexer_fn{
-                [l_r = std::tuple<L, R>{ std::forward<L>(l), std::forward<R>(r) }]<typename C>(this C&& sself, size_t i)
-                {
-                    auto&&[l, r] = std::forward_like<C>(l_r);
-                    return l(i) ^ r(i);
-                }
-            };
-        }
-    };
-
-    struct i_t{};
-}
-
-namespace crypto12381
-{
-    template<std::ranges::view R>
-    struct vector : public std::ranges::view_interface<vector<R>>
-    {
-    public:
-        using std::ranges::view_interface<vector<R>>::operator[];
-
-        vector() requires std::default_initializable<R> = default;
-
-        constexpr vector(R base) 
-        noexcept(std::is_nothrow_move_constructible_v<R>)
-        : base_(std::move(base))
-        {}
-
-        template<class Self>
-        constexpr auto begin(this Self&& self)
-        {
-            return std::ranges::begin(std::forward_like<Self>(self.base_));
-        }
-
-        template<class Self>
-        constexpr auto end(this Self&& self)
-        {
-            return std::ranges::end(std::forward_like<Self>(self.base_));
-        }
-
-
-        template<class Self>
-        constexpr auto size(this Self&& self) requires std::ranges::sized_range<R>
-        {
-            return std::ranges::size(std::forward_like<Self>(self.base_));
-        }
-
-        template<typename Self>
-        auto operator[](this Self&& self, detail::i_t)
-        {
-            return detail::indexer_fn{
-                [r = std::tuple<Self>(std::forward<Self>(self))]<typename Closure>(this Closure&&, size_t i)
-                {
-                    return std::forward_like<Closure>(std::get<0>(r))[i];
-                }
-            };
-        }
-
-    private:
-        R base_;
-    };
-
-    template<typename R>
-    vector(R&& r) -> vector<std::views::all_t<R>>;
-}
-
-template <class R>
-constexpr bool std::ranges::enable_borrowed_range<crypto12381::vector<R>> = std::ranges::enable_borrowed_range<R>;
+#include "ranges.hpp"
 
 namespace crypto12381
 {
@@ -121,7 +25,7 @@ namespace crypto12381
         //     constant<std::remove_cvref_t<T>{}>, 
         //     std::type_identity<std::remove_cvref_t<decltype(select_in(constant<std::remove_cvref_t<T>{}>, random))>>{}
         // ) } -> std::same_as<bool>;
-    };
+    };  
 
     template<typename T>
     concept parseable = requires(serialized_view<std::remove_cvref_t<T>{}> bytes) 
@@ -455,12 +359,58 @@ namespace crypto12381::detail
         core::sha3 state_;
     };
 
+    template<typename...T>
+    struct hash_pack;
+
+    template<typename Set>
+    struct hash_to_fn
+    {
+        template<typename...Args>
+        constexpr auto operator()(Args&&...args)const
+        {
+            return (hash_state{} | ... | std::forward<Args>(args)).to(Set{});
+        }
+    };
+
+    template<typename...T>
+    struct hash_pack
+    {
+        std::tuple<T...> ranges;
+
+        constexpr explicit hash_pack(T&&...t)
+        : ranges{ std::forward<T>(t)... }
+        {
+
+        }
+        hash_pack(const hash_pack&) = delete;
+        hash_pack(hash_pack&&) = delete;
+
+
+        template<typename Set>
+        constexpr auto to(Set)&&
+        {
+            return [&]<size_t...I>(std::index_sequence<I...>)
+            {
+                return elementwise_view{std::views::zip_transform(
+                    hash_to_fn<Set>{},
+                    std::get<I>(std::move(ranges)).base()...
+                )};
+            }(std::index_sequence_for<T...>{});
+        }
+    };
     struct hash_fn
     {
         template<typename...Args>
-        constexpr hash_state operator()(Args&&...args) const noexcept
+        constexpr auto operator()(Args&&...args) const
         {
-            return (hash_state{} | ... | std::forward<Args>(args));
+            if constexpr(not (... || elementwise_range<Args>))
+            {
+                return (hash_state{} | ... | std::forward<Args>(args));
+            }
+            else
+            {
+                return hash_pack<Args...>{std::forward<Args>(args)...};
+            }
         }
 
         template<typename T, typename Self>
@@ -469,6 +419,10 @@ namespace crypto12381::detail
             return hash_state{} | t;
         }
     };
+
+    
+
+    
 
     void sum();
 
@@ -480,10 +434,25 @@ namespace crypto12381::detail
             return sum(std::type_identity<std::remove_cvref_t<std::ranges::range_value_t<R>>>{}, std::forward<R>(r));
         }
 
-        template<typename F>
-        constexpr auto operator()(size_t n, F&& f) const
+        // template<typename F>
+        // constexpr auto operator()(size_t n, F&& f) const
+        // {
+        //     return (*this)(std::views::iota(0uz, n) | std::views::transform(std::forward<F>(f)));
+        // }
+
+        template<std::ranges::range RI>
+        constexpr auto operator[](RI&& indexes) const
         {
-            return (*this)(std::views::iota(0uz, n) | std::views::transform(std::forward<F>(f)));
+            return [indexes = std::tuple<RI>((RI&&)indexes)]
+            <std::ranges::range RE, typename Self>(this Self&& self, RE&& elemens)
+            {
+                return sum_fn{}(std::forward<RE>(elemens)[std::get<0>(std::forward_like<Self>(indexes))]);
+            };
+        }
+
+        constexpr auto operator[](size_t n) const
+        {
+            return (*this)[i.in[n]];
         }
     };
 
@@ -497,10 +466,24 @@ namespace crypto12381::detail
             return product(std::type_identity<std::remove_cvref_t<std::ranges::range_value_t<R>>>{}, std::forward<R>(r));
         }
 
-        template<typename F>
-        constexpr auto operator()(size_t n, F&& f) const
+        // template<typename F>
+        // constexpr auto operator()(size_t n, F&& f) const
+        // {
+        //     return (*this)(std::views::iota(0uz, n) | std::views::transform(std::forward<F>(f)));
+        // }
+
+        template<std::ranges::range RI>
+        constexpr auto operator[](RI&& indexes) const
         {
-            return (*this)(std::views::iota(0uz, n) | std::views::transform(std::forward<F>(f)));
+            return [indexes = std::views::all(std::forward<RI>(indexes))]<std::ranges::range RE>(RE&& elemens)
+            {
+                return product_fn{}(std::forward<RE>(elemens)[indexes]);
+            };
+        }
+
+        constexpr auto operator[](size_t n) const
+        {
+            return (*this)[i.in[n]];
         }
     };    
 }
@@ -512,8 +495,6 @@ namespace crypto12381
     inline constexpr detail::sum_fn sum{};
 
     inline constexpr detail::product_fn product{};
-
-    inline constexpr detail::i_t i{};
 
     inline constexpr auto Σ = sum;
 
@@ -578,7 +559,7 @@ namespace crypto12381::detail::sets
         return cartesian_product{ l, r };
     }
 
-    template<typename L, typename R>
+    template<typename L, typename R> requires (not std::ranges::range<L>)
     constexpr auto operator|(L l, R r) noexcept
     {
         return cartesian_product{ l, r };
