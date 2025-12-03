@@ -38,7 +38,7 @@ namespace crypto12381::detail
 
     struct i_t
     {
-        static constexpr in_t in;
+        static constexpr in_t in{};
     };
 
     template<std::ranges::range RE, std::ranges::range RI>
@@ -233,13 +233,7 @@ namespace crypto12381
         {
             return detail::elementwise_view{ std::forward<Self>(self).base() };
         }
-
-    
     };
-
-    constexpr bool tt = std::ranges::view<vector<std::span<int>>>;
-
-    constexpr bool tt2 = std::ranges::view<std::ranges::owning_view<std::span<int>>>;
 }
 
 template <class R>

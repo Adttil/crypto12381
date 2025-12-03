@@ -8,6 +8,8 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+set(CMAKE_EXE_LINKER_FLAGS "-static")
+
 file(GLOB crypto12381_srcs "src/*.cpp")
 file(GLOB miracl_core_srcs "3rd-party/miracl-core/*.cpp")
 add_library(crypto12381 STATIC ${crypto12381_srcs} ${miracl_core_srcs})

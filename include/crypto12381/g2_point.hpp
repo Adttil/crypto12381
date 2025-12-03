@@ -1,6 +1,7 @@
 #ifndef CRYPTO12381_G2_POINT_HPP
 #define CRYPTO12381_G2_POINT_HPP
 
+#include <cstring>
 #include <tuple>
 #include <miracl-core/bls_BLS12381.h>
 

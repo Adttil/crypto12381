@@ -1,6 +1,7 @@
 #ifndef CRYPTO12381_ZP_NUMBER_HPP
 #define CRYPTO12381_ZP_NUMBER_HPP
 
+#include <cstring>
 #include <stdexcept>
 #include <span>
 #include <limits>
@@ -156,7 +157,7 @@ namespace crypto12381::detail
 
         ZpNumber2Data& operator=(const ZpNumberData& data) noexcept
         {
-            *this = {};
+            *this = ZpNumber2Data{};
             for(size_t i = 0; i < n_chunks; ++i)
             {
                 chunks[i] = data[i];
