@@ -210,6 +210,19 @@ namespace crypto12381::detail
             return result;
         }
 
+        template<std::ranges::range R> 
+        requires specified<std::ranges::range_value_t<R>, G1Point>
+        friend constexpr auto product(std::type_identity<G1Point>, R&& r) 
+        {
+            G1Point result;
+            BLS12381::ECP_inf(result.data_);
+            for(auto&& p : std::forward<R>(r))
+            {
+                BLS12381::ECP_add(result.data_, p.G1_point().data_);
+            }
+            return result;
+        }
+
     private:
         constexpr G1Point() noexcept = default;
 
@@ -326,6 +339,19 @@ namespace crypto12381::detail
                 const_cast<detail::G1Point&>(detail::G1Point::default_generator()), 
                 crypto12381::select_in<*Zp>(random) 
             };
+        }
+
+        template<std::ranges::range R> 
+        requires specified<std::ranges::range_value_t<R>, G1Pow>
+        friend constexpr auto product(std::type_identity<G1Pow>, R&& r) 
+        {
+            auto result = data.create<G1Point>();
+            BLS12381::ECP_inf(data(result));
+            for(auto&& p : std::forward<R>(r))
+            {
+                BLS12381::ECP_add(data(result), data(p.G1_point()));
+            }
+            return result;
         }
     private:
         constexpr explicit G1Pow(P&& point, V&& number) noexcept
