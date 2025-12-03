@@ -1,4 +1,4 @@
-#include <print>
+#include <iostream>
 
 #include <bbs.hpp>
 
@@ -16,10 +16,10 @@ int main()
 
     if(success)
     {
-        std::println("success");
+        std::cout << "success";
     }
     else
     {
-        std::println("failed");
+        std::cout << "failed";
     }
 }

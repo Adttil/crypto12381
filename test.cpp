@@ -1,4 +1,4 @@
-#include <print>
+#include <iostream>
 #include <crypto12381/crypto12381.hpp>
 
 using namespace crypto12381;
@@ -14,11 +14,11 @@ void pair_test()
 
     if(pair(g1^x, g2^y) == (pair(g1, g2)^(x * y)))
     {
-        std::println("succeed");
+        std::cout << "succeed";
     }
     else
     {
-        std::println("failed");
+        std::cout << "failed";
     }
 }
 
@@ -38,11 +38,11 @@ void parse_test()
 
     if(x == x1 && Y == Y1 && Z == Z1)
     {
-        std::println("succeed");
+        std::cout << "succeed";
     }
     else
     {
-        std::println("failed");
+        std::cout << "failed";
     }
 }
 
@@ -57,11 +57,11 @@ void hash_test()
 
     if(c1 == c2)
     {
-        std::println("succeed");
+        std::cout << "succeed";
     }
     else
     {
-        std::println("failed");
+        std::cout << "failed";
     }
 }
 

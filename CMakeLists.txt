@@ -21,6 +21,6 @@ target_link_libraries(example_ps PRIVATE crypto12381)
 add_executable(test "test.cpp")
 target_link_libraries(test PRIVATE crypto12381)
 
-if(CRYPTO12381_INCLUDE_TESTS)
+if(CRYPTO12381_INCLUDE_EXAMPLES)
     add_subdirectory(examples)
 endif()

@@ -1,5 +1,5 @@
 #include <array>
-#include <print>
+#include <iostream>
 
 #include <ps.hpp>
 
@@ -32,11 +32,11 @@ void single_message()
     
     if(success)
     {
-        std::println("success");
+        std::cout << "success";
     }
     else
     {
-        std::println("failed");
+        std::cout << "failed";
     }
 }
 
@@ -56,11 +56,11 @@ void multi_message()
     
     if(success)
     {
-        std::println("success");
+        std::cout << "success";
     }
     else
     {
-        std::println("failed");
+        std::cout << "failed";
     }
 }
 
@@ -86,11 +86,11 @@ void sequentail_aggregate()
     
     if(success)
     {
-        std::println("success");
+        std::cout << "success";
     }
     else
     {
-        std::println("failed");
+        std::cout << "failed";
     }
 }
 

@@ -1,5 +1,6 @@
 #include <array>
-#include <print>
+#include <cstring>
+#include <iostream>
 #include <ranges>
 
 #include <bbs.hpp>
@@ -18,11 +19,11 @@ int main()
 
     if(bbs::verify(gpk, message, signature))
     {
-        std::println("pass");
+        std::cout << "pass\n";
     }
     else
     {
-        std::println("reject");
+        std::cout << "reject\n";
     }
 
     auto A = bbs::open(gmsk, signature);
@@ -30,7 +31,7 @@ int main()
     {
         if(std::memcmp(&A, &gski, sizeof(A)) == 0)
         {
-            std::println("index: {}", i);
+            std::cout << "index: " << i << '\n';
             break;
         }
     }
