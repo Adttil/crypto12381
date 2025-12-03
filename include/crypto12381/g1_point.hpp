@@ -347,10 +347,19 @@ namespace crypto12381::detail
         {
             auto result = data.create<G1Point>();
             BLS12381::ECP_inf(data(result));
-            for(auto&& p : std::forward<R>(r))
+            
+            const auto sentinel = std::ranges::end(r);
+            for(auto iter = std::ranges::begin(r); iter != sentinel; ++iter)
             {
-                BLS12381::ECP_add(data(result), data(p.G1_point()));
+                auto iter_prev = iter++;
+                if(iter == sentinel)
+                {
+                    BLS12381::ECP_add(data(result), data((*iter_prev).G1_point()));
+                    break;
+                }
+                BLS12381::ECP_add(data(result), data((*iter_prev * *iter)));
             }
+
             return result;
         }
     private:
