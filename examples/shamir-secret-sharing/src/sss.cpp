@@ -13,7 +13,7 @@ namespace crypto12381::sss
 
     serialized_field<Zp> reconstruct(std::span<const size_t> indexes, std::span<const serialized_field<Zp>> shares) noexcept{
         auto t = indexes.size();
-        auto x = make_Zp((indexes|algebraic)[i]) (i.in[t]) | materialize;
+        auto x = make_Zp(i) (i.in(indexes)) | materialize;
         auto y = parse<Zp>(shares);
 
         auto λi = Π[j.in[t].except(i)] (-x[j] / (x[i] - x[j]));
