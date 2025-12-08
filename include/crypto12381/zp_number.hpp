@@ -2,6 +2,7 @@
 #define CRYPTO12381_ZP_NUMBER_HPP
 
 #include <cstring>
+#include <cmath>
 #include <stdexcept>
 #include <span>
 #include <limits>
@@ -413,6 +414,12 @@ namespace crypto12381::detail
             return result;
         }
 
+         template<ChunkRange RHead, ChunkRange RRest>
+        friend constexpr auto operator/(const ZpNumber& l, const ZpNumber<RHead, RRest>& r) noexcept
+        {
+            return l * inverse(r);
+        }
+
         template<ChunkRange RHead, ChunkRange RRest>
         friend constexpr bool operator==(const ZpNumber& l, const ZpNumber<RHead, RRest>& r) noexcept
         {
@@ -497,6 +504,20 @@ namespace crypto12381::detail
                     return result;
                 }
             }
+        }
+
+        template<std::ranges::range R> 
+        requires specified<std::ranges::range_value_t<R>, ZpNumber>
+        friend constexpr auto product(std::type_identity<ZpNumber>, R&& r) 
+        {
+            auto iter = std::ranges::begin(r);
+            auto result = (*iter).Zp_number();
+            auto& x = data(result);
+            for(auto i = ++iter; i != std::ranges::end(r); ++i)
+            {
+                x = data((result * *i).Zp_number());
+            }
+            return result;
         }
 
     private:
@@ -719,6 +740,24 @@ namespace crypto12381::detail
         }
 
         template<ChunkRange RHead, ChunkRange RRest>
+        friend constexpr auto operator/(const ZpNumber2& l, const ZpNumber2<RHead, RRest>& r) noexcept
+        {
+            return l * inverse(r);
+        }
+
+        template<ChunkRange RHead, ChunkRange RRest>
+        friend constexpr auto operator/(const ZpNumber2& l, const ZpNumber<RHead, RRest>& r) noexcept
+        {
+            return l * inverse(r);
+        }
+
+        template<ChunkRange LHead, ChunkRange LRest>
+        friend constexpr auto operator/(const ZpNumber<LHead, LRest>& l, const ZpNumber2& r) noexcept
+        {
+            return l * inverse(r);
+        }
+
+        template<ChunkRange RHead, ChunkRange RRest>
         friend constexpr bool operator==(const ZpNumber2& l, const ZpNumber2<RHead, RRest>& r) noexcept
         {
             return data(l.normalize()) == data(r.normalize());
@@ -793,6 +832,20 @@ namespace crypto12381::detail
             }
         }
 
+        template<std::ranges::range R> 
+        requires specified<std::ranges::range_value_t<R>, ZpNumber2>
+        friend constexpr auto product(std::type_identity<ZpNumber2>, R&& r) 
+        {
+            auto iter = std::ranges::begin(r);
+            auto result = (*iter).Zp_number();
+            auto& x = data(result);
+            for(auto i = ++iter; i != std::ranges::end(r); ++i)
+            {
+                x = data((result * *i).Zp_number());
+            }
+            return result;
+        }
+
     private:
         constexpr ZpNumber2() noexcept = default;
 
@@ -854,12 +907,82 @@ namespace crypto12381::detail::sets
             result.emplace_back(crypto12381::parse<Zp>(buffer));
         }
 
-        return vector{ std::move(result) };
+        return std::move(result) | algebraic;
     }
 
     inline auto hash_to(hash_state&& state, Zp_t) noexcept
     {
         return Zp_normalized_t::from_hash(std::move(state));
+    }
+}
+
+namespace crypto12381 
+{
+    namespace detail 
+    {
+        struct make_Zp_fn : symbolic_functor_interface<make_Zp_fn>
+        {
+            using symbolic_functor_interface<make_Zp_fn>::operator();
+
+            template<std::integral T> requires (sizeof(T) <= serialized_size<Zp>)
+            static auto operator()(T x) noexcept
+            {
+                if constexpr(std::signed_integral<T>)
+                {
+                    if(x >= 0)
+                    {
+                        return make_Zp((std::make_unsigned_t<T>)x);
+                    }
+                    else
+                    {
+                        return (detail::ZpNumber<>)-make_Zp((std::make_unsigned_t<T>)-x);
+                    }
+                }
+                else
+                {
+                    x = std::byteswap(x);
+                    serialized_field<Zp> buffer{};
+                    std::memcpy(buffer.data() + (serialized_size<Zp> - sizeof(T)), &x, sizeof(T));
+                    return detail::ZpNumber<>{ buffer };
+                }
+            }
+        };
+    }
+
+    inline namespace functors 
+    {
+        inline constexpr detail::make_Zp_fn make_Zp{};
+    }
+
+    namespace detail 
+    {
+        struct polynomial_fn : symbolic_functor_interface<polynomial_fn>
+        {
+            using symbolic_functor_interface<polynomial_fn>::operator();
+
+            template<not_symbolic Tx, not_symbolic Ta0, not_symbolic Ra>
+            static constexpr decltype(auto) operator()(Tx&& x, Ta0&& a0, Ra&& a)
+            {
+                if constexpr(std::integral<std::remove_cvref_t<Tx>>)
+                {
+                    using type = std::remove_cvref_t<Tx>;
+                    auto n = std::ranges::size(a);
+                    auto a_ = (Ra&&)a | algebraic; 
+                    auto x_pow = sequence(1, n) 
+                    | transform([&](auto i){ return make_Zp((type)std::pow(x, i)); });
+                    return a0 + Σ[n - 1](a_[i] * x_pow[i]);
+                }
+                else
+                {
+                    static_assert("false", "Not implement yet.");
+                }
+            }
+        };
+    }
+
+    inline namespace functors 
+    {
+        inline constexpr detail::polynomial_fn polynomial{};
     }
 }
 

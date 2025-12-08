@@ -13,7 +13,7 @@
 #include "random.hpp"
 #include "constant.hpp"
 #include "interface.hpp"
-#include "ranges.hpp"
+#include "algebra.hpp"
 
 namespace crypto12381
 {
@@ -70,12 +70,39 @@ namespace crypto12381::detail
 
     void hash_to();
 
+    template<typename L, typename R>
+    constexpr auto pow(L&& l, R&& r)
+    noexcept(noexcept(std::forward<L>(l) ^ std::forward<R>(r)))
+    requires requires{std::forward<L>(l) ^ std::forward<R>(r);}
+    {
+        return std::forward<L>(l) ^ std::forward<R>(r);
+    }
+
+    template<auto Set>
+    struct select_vector_in_fn
+    {
+        size_t n;
+
+        friend constexpr auto operator-(RandomEngine& random, select_vector_in_fn self) noexcept
+        {
+            return std::views::repeat(0, self.n) 
+                | transform([&](auto){
+                    return select_in(std::integral_constant<decltype(Set), Set>{}, random);
+                });
+        }
+    };
+
     template<auto Set>
     struct select_in_fn
     {
         constexpr auto operator()(RandomEngine& random) const noexcept
         {
             return select_in(std::integral_constant<decltype(Set), Set>{}, random);
+        }
+
+        constexpr auto operator()(size_t n) const noexcept
+        {
+            return select_vector_in_fn<Set>{ n };
         }
         
         friend constexpr auto operator-(RandomEngine& random, select_in_fn) noexcept
@@ -128,7 +155,7 @@ namespace crypto12381::detail
             }
             else if constexpr(std::ranges::range<T> && requires(std::ranges::range_value_t<T> e){ (*this)(e); })
             {
-                return vector{ std::forward<T>(t) | std::views::transform(crypto12381::parse<Set...>) };
+                return std::forward<T>(t) | transform(crypto12381::parse<Set...>);
             }
             else
             {
@@ -171,7 +198,7 @@ namespace crypto12381::detail
         // constexpr auto operator()(R&& r) const
         // requires requires(std::ranges::range_value_t<R> e){ (*this)(e); }
         // {
-        //     return vector{ std::forward<R>(r) | std::views::transform(crypto12381::parse<Set...>) };
+        //     return algebraic_view{ std::forward<R>(r) | std::views::transform(crypto12381::parse<Set...>) };
         // }
     };
 
@@ -270,9 +297,11 @@ namespace crypto12381
 {
     namespace detail 
     {
-        struct serialize_fn
+        struct serialize_fn : symbolic_functor_interface<serialize_fn>
         {
-            template<typename...Args> 
+            using symbolic_functor_interface<serialize_fn>::operator();
+
+            template<not_symbolic...Args> 
             constexpr serialize_pack<Args...> operator()(Args&&...args) const
             {
                 return {{ std::forward<Args>(args)... }};
@@ -363,8 +392,10 @@ namespace crypto12381::detail
     struct hash_pack;
 
     template<typename Set>
-    struct hash_to_fn
+    struct hash_to_fn : symbolic_functor_interface<hash_to_fn<Set>>
     {
+        using symbolic_functor_interface<hash_to_fn>::operator();
+
         template<typename...Args>
         constexpr auto operator()(Args&&...args)const
         {
@@ -391,19 +422,24 @@ namespace crypto12381::detail
         {
             return [&]<size_t...I>(std::index_sequence<I...>)
             {
-                return elementwise_view{std::views::zip_transform(
-                    hash_to_fn<Set>{},
-                    std::get<I>(std::move(ranges)).base()...
-                )};
+                return hash_to_fn<Set>{}((T&&)std::get<I>(ranges)...);
+                // return zip_transform(
+                //     hash_to_fn<Set>{},
+                //     (T&&)std::get<I>(ranges)...
+                // );
             }(std::index_sequence_for<T...>{});
         }
     };
-    struct hash_fn
+
+    struct hash_fn// : symbolic_functor_interface<hash_fn>
     {
-        template<typename...Args>
+        //using symbolic_functor_interface<hash_fn>::operator();
+
+        template<typename...Args> 
         constexpr auto operator()(Args&&...args) const
         {
-            if constexpr(not (... || elementwise_range<Args>))
+            //return (hash_state{} | ... | std::forward<Args>(args));
+            if constexpr(not (... || symbolic<Args>))
             {
                 return (hash_state{} | ... | std::forward<Args>(args));
             }
@@ -426,9 +462,11 @@ namespace crypto12381::detail
 
     void sum();
 
-    struct sum_fn
+    struct sum_fn : symbolic_functor_interface<sum_fn>
     {
-        template<std::ranges::range R>
+        using symbolic_functor_interface<sum_fn>::operator();
+
+        template<std::ranges::range R> requires (not symbolic<R>)
         constexpr auto operator()(R&& r) const
         {
             return sum(std::type_identity<std::remove_cvref_t<std::ranges::range_value_t<R>>>{}, std::forward<R>(r));
@@ -440,13 +478,23 @@ namespace crypto12381::detail
         //     return (*this)(std::views::iota(0uz, n) | std::views::transform(std::forward<F>(f)));
         // }
 
-        template<std::ranges::range RI>
-        constexpr auto operator[](RI&& indexes) const
+        // template<std::ranges::range RI>
+        // constexpr auto operator[](RI&& indexes) const
+        // {
+        //     return [indexes = std::tuple<RI>((RI&&)indexes)]
+        //     <std::ranges::range RE, typename Self>(this Self&& self, RE&& elemens)
+        //     {
+        //         return sum_fn{}(std::forward<RE>(elemens)[std::get<0>(std::forward_like<Self>(indexes))]);
+        //     };
+        // }
+
+        template<fixed_string Name, class RI>
+        constexpr auto operator[](symbol_substitution<Name, RI, true> substitution) const
         {
-            return [indexes = std::tuple<RI>((RI&&)indexes)]
-            <std::ranges::range RE, typename Self>(this Self&& self, RE&& elemens)
+            return [substitution = std::move(substitution)]
+            <class TExpr, typename Self>(this Self&& self, TExpr&& expr)
             {
-                return sum_fn{}(std::forward<RE>(elemens)[std::get<0>(std::forward_like<Self>(indexes))]);
+                return sum_fn{}(substitute((TExpr&&)expr, std::forward_like<Self>(substitution)));
             };
         }
 
@@ -458,9 +506,11 @@ namespace crypto12381::detail
 
     void product() = delete;
 
-    struct product_fn
+    struct product_fn : symbolic_functor_interface<product_fn>
     {
-        template<std::ranges::range R>
+        using symbolic_functor_interface<product_fn>::operator();
+
+        template<std::ranges::range R> requires (not symbolic<R>)
         constexpr auto operator()(R&& r) const
         {
             return product(std::type_identity<std::remove_cvref_t<std::ranges::range_value_t<R>>>{}, std::forward<R>(r));
@@ -472,12 +522,14 @@ namespace crypto12381::detail
         //     return (*this)(std::views::iota(0uz, n) | std::views::transform(std::forward<F>(f)));
         // }
 
-        template<std::ranges::range RI>
-        constexpr auto operator[](RI&& indexes) const
+
+        template<fixed_string Name, class RI>
+        constexpr auto operator[](symbol_substitution<Name, RI, true> substitution) const
         {
-            return [indexes = std::views::all(std::forward<RI>(indexes))]<std::ranges::range RE>(RE&& elemens)
+            return [substitution = std::move(substitution)]
+            <class TExpr, typename Self>(this Self&& self, TExpr&& expr)
             {
-                return product_fn{}(std::forward<RE>(elemens)[indexes]);
+                return product_fn{}(substitute((TExpr&&)expr, std::forward_like<Self>(substitution)));
             };
         }
 

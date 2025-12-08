@@ -32,9 +32,11 @@ namespace crypto12381::bbs
 
     Keys key_gen(const PublicParameters& pp, RandomEngine& random) noexcept;
 
-    Signature sign(const PublicParameters& pp, const PrivateKey& sk, std::span<const char> message, RandomEngine& random);
+    std::vector<serialized_field<Zp>> encode_message(std::span<const char> original_message) noexcept;
 
-    bool verify(const PublicParameters& pp, const PublicKey& pk, std::span<const char> message, const Signature& signature);
+    Signature sign(const PublicParameters& pp, const PrivateKey& sk, std::span<const serialized_field<Zp>> message, RandomEngine& random);
+
+    bool verify(const PublicParameters& pp, const PublicKey& pk, std::span<const serialized_field<Zp>> message, const Signature& signature);
 }
 
 #endif

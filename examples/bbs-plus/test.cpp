@@ -16,10 +16,10 @@ int main()
 
     if(success)
     {
-        std::cout << "success";
+        std::cout << "success\n";
     }
     else
     {
-        std::cout << "failed";
+        std::cout << "failed\n";
     }
 }

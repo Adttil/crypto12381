@@ -14,11 +14,11 @@ void pair_test()
 
     if(pair(g1^x, g2^y) == (pair(g1, g2)^(x * y)))
     {
-        std::cout << "succeed";
+        std::cout << "succeed\n";
     }
     else
     {
-        std::cout << "failed";
+        std::cout << "failed\n";
     }
 }
 
@@ -38,11 +38,11 @@ void parse_test()
 
     if(x == x1 && Y == Y1 && Z == Z1)
     {
-        std::cout << "succeed";
+        std::cout << "succeed\n";
     }
     else
     {
-        std::cout << "failed";
+        std::cout << "failed\n";
     }
 }
 
@@ -57,11 +57,11 @@ void hash_test()
 
     if(c1 == c2)
     {
-        std::cout << "succeed";
+        std::cout << "succeed\n";
     }
     else
     {
-        std::cout << "failed";
+        std::cout << "failed\n";
     }
 }
 
@@ -70,6 +70,11 @@ int main()
     pair_test();
     parse_test();
     hash_test();
+
+    // static constexpr symbol<"x"> x;
+    // static constexpr symbol<"y"> y;
+    // static constexpr auto f = "x"_sym + y + 1;
+    // constexpr auto z = f(x = 3, y = 4);
 
     return 0;
 }

@@ -32,11 +32,11 @@ void single_message()
     
     if(success)
     {
-        std::cout << "success";
+        std::cout << "success\n";
     }
     else
     {
-        std::cout << "failed";
+        std::cout << "failed\n";
     }
 }
 
@@ -56,11 +56,11 @@ void multi_message()
     
     if(success)
     {
-        std::cout << "success";
+        std::cout << "success\n";
     }
     else
     {
-        std::cout << "failed";
+        std::cout << "failed\n";
     }
 }
 
@@ -86,11 +86,11 @@ void sequentail_aggregate()
     
     if(success)
     {
-        std::cout << "success";
+        std::cout << "success\n";
     }
     else
     {
-        std::cout << "failed";
+        std::cout << "failed\n";
     }
 }
 

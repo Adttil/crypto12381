@@ -8,6 +8,12 @@ int main()
 {
     auto random = create_random_engine("seed");
 
-    auto pp = iss_setup(16uz, random);
-        
+    const auto [pp, keys] = iss_setup(4uz, random);
+    const auto& [pk, sk] = keys;
+
+    const serialized_field<Zp> attributes[4]{};
+
+    auto creds = cred_iss(pp, sk, 4, 6, attributes, random);
+
+    std::cout << "creds count: " << creds.size() << '\n';
 }

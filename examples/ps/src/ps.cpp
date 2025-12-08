@@ -139,7 +139,7 @@ namespace crypto12381::ps
         auto [g1, X1, g2, X2] = parse<G1^2 | G2^2>(pp);
         auto Y2 = parse<G2>(pks);
         auto r = messages.size();
-        auto m = hash(messages|i).to(Zp) [i.in[r]];        
+        auto m = hash(subscript(messages, i)).to(Zp) (i.in[r]);        
         auto [σ1, σ2] = parse<G1^2>(signature);
 
         return pair(σ1, X2 * Π[r](Y2[i]^m[i])) == pair(σ2, g2);

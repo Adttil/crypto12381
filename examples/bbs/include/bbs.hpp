@@ -1,5 +1,5 @@
-#ifndef CRYPTO12381_TESTS_BBS04_BBS_HPP
-#define CRYPTO12381_TESTS_BBS04_BBS_HPP
+#ifndef CRYPTO12381_EXAMPLES_BBS_BBS_HPP
+#define CRYPTO12381_EXAMPLES_BBS_BBS_HPP
 #include <vector>
 #include <crypto12381/interface.hpp>
 
@@ -32,9 +32,11 @@ namespace crypto12381::bbs
 
     Keys key_gen(const PublicParameters& pp, RandomEngine& random) noexcept;
 
-    Signature sign(const PublicParameters& pp, const PrivateKey& sk, std::span<const char> message, RandomEngine& random);
+    std::vector<serialized_field<Zp>> encode_message(std::span<const char> original_message) noexcept;
 
-    bool verify(const PublicParameters& pp, const PublicKey& pk, std::span<const char> message, const Signature& signature);
+    Signature sign(const PublicParameters& pp, const PrivateKey& sk, std::span<const serialized_field<Zp>> message, RandomEngine& random);
+
+    bool verify(const PublicParameters& pp, const PublicKey& pk, std::span<const serialized_field<Zp>> message, const Signature& signature);
 }
 
 #endif
