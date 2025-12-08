@@ -39,7 +39,7 @@ namespace crypto12381::mhac_bbs
         auto a = random-select_in<Zp>(t - 1) | materialize;
 
         // (A, share of e)
-        return serialize(A, polynomial(x, e, std::move(a)))  (x.in[1, n + 1]);
+        return serialize(A, polynomial(x, e, a))  (x.in[1, n + 1]);
     }
 
     std::vector<Cred> cred_pres(
