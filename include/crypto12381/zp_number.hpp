@@ -566,7 +566,7 @@ namespace crypto12381::detail
         constexpr auto operator-() const
         {
             auto result = data.create<ZpNumber<>>();
-            miracl_core::mod(data(result), data(Zp_number()), p_data);
+            miracl_core::mod(data(result), auto{ data_ }, p_data);
             miracl_core::mod_negate(data(result), data(result), p_data);
             return result;
 
