@@ -3,7 +3,8 @@
 
 #include <cstring>
 #include <tuple>
-#include <miracl-core/bls_BLS12381.h>
+
+#include "miracl_core_interface.hpp"
 
 #include "general.hpp"
 #include "zp_number.hpp"
@@ -49,11 +50,16 @@ namespace crypto12381::detail
 
     struct G2PointData
     {
-        BLS12381::ECP2 ecp;
+        miracl_core::point2 ecp;
 
-        constexpr operator BLS12381::ECP2*()
+        constexpr operator miracl_core::point2&() noexcept
         {
-            return &ecp;
+            return ecp;
+        }
+
+        constexpr operator const miracl_core::point2&() const noexcept
+        {
+            return ecp;
         }
     };
 
@@ -65,12 +71,12 @@ namespace crypto12381::detail
         {
             serialized_field<G2> buffer;
             std::memcpy(buffer.data(), bytes.data(), serialized_size<G2>);
-            core::octet buffer_view{
+            miracl_core::bytes_view buffer_view{
                 .len = serialized_size<G2>,
                 .max = serialized_size<G2>,
-                .val = buffer.data()
+                .data = buffer.data()
             };
-            BLS12381::ECP2_fromOctet(data_, &buffer_view);
+            miracl_core::from_bytes(data_, buffer_view);
         }
 
         constexpr G2Point(const G2Point&) = default;
@@ -78,12 +84,12 @@ namespace crypto12381::detail
 
         void serialize(std::span<char, serialized_size<G2>> bytes) const noexcept
         {
-            core::octet buffer_view{
+            miracl_core::bytes_view buffer_view{
                 .len = 0,
                 .max = serialized_size<G2>,
-                .val = bytes.data()
+                .data = bytes.data()
             };
-            BLS12381::ECP2_toOctet(&buffer_view, auto{ data_ }, true);
+            miracl_core::to_bytes(buffer_view, auto{ data_ }, true);
         }
 
         template<typename Self>
@@ -108,7 +114,7 @@ namespace crypto12381::detail
         {
             auto result = G2Point::default_generator();
             auto x = crypto12381::select_in<Zp>(random);
-            BLS12381::PAIR_G2mul(result.data_, data(x));
+            miracl_core::multiply(result.data_, data(x));
             return result;
         }
 
@@ -116,7 +122,7 @@ namespace crypto12381::detail
         {
             auto result = G2Point::default_generator();
             auto x = crypto12381::select_in<*Zp>(random);
-            BLS12381::PAIR_G2mul(result.data_, data(x));
+            miracl_core::multiply(result.data_, data(x));
             return result;
         }
 
@@ -126,13 +132,13 @@ namespace crypto12381::detail
             if constexpr(g2_reusable<Self>)
             {
                 decltype(auto) result = std::forward<Self>(self).G2_point();
-                BLS12381::ECP2_neg(data(result));
+                miracl_core::negate(data(result));
                 return result;
             }
             else
             {
                 G2Point result = std::forward<Self>(self).G2_point();
-                BLS12381::ECP2_neg(data(result));
+                miracl_core::negate(data(result));
                 return result;
             }
         }
@@ -143,19 +149,19 @@ namespace crypto12381::detail
             if constexpr(g2_reusable<L>)
             {
                 decltype(auto) result = l.G2_point();
-                BLS12381::ECP2_add(result.data_, r.G2_point().data_);
+                miracl_core::add(result.data_, r.G2_point().data_);
                 return result;
             }
             else if constexpr(g2_reusable<R>)
             {
                 decltype(auto) result = r.G2_point();
-                BLS12381::ECP2_add(result.data_, l.G2_point().data_);
+                miracl_core::add(result.data_, l.G2_point().data_);
                 return result;
             }
             else
             {
                 G2Point result = l.G2_point();
-                BLS12381::ECP2_add(result.data_, r.G2_point().data_);
+                miracl_core::add(result.data_, r.G2_point().data_);
                 return result;
             }
         }
@@ -166,13 +172,13 @@ namespace crypto12381::detail
             if constexpr(g2_reusable<L>)
             {
                 decltype(auto) result = l.G2_point();
-                BLS12381::ECP2_sub(result.data_, r.G2_point().data_);
+                miracl_core::sub(result.data_, r.G2_point().data_);
                 return result;
             }
             else
             {
                 G2Point result = l.G2_point();
-                BLS12381::ECP2_sub(result.data_, r.G2_point().data_);
+                miracl_core::sub(result.data_, r.G2_point().data_);
                 return result;
             }
         }
@@ -183,13 +189,13 @@ namespace crypto12381::detail
             if constexpr(g2_reusable<P>)
             {
                 decltype(auto) result = point.G2_point();
-                BLS12381::PAIR_G2mul(result.data_, data(number.Zp_number()));
+                miracl_core::multiply(result.data_, data(number.Zp_number()));
                 return result;
             }
             else
             {
                 auto result = point.G2_point();
-                BLS12381::PAIR_G2mul(result.data_, data(number.Zp_number()));
+                miracl_core::multiply(result.data_, data(number.Zp_number()));
                 return result;
             }
         }
@@ -197,7 +203,7 @@ namespace crypto12381::detail
         template<G2_element L, G2_element R>
         friend constexpr bool operator==(L&& l, R&& r) noexcept
         {
-            return BLS12381::ECP2_equals(data(l.G2_point()), data(r.G2_point())) == 1;
+            return miracl_core::equal(data(l.G2_point()), data(r.G2_point())) == 1;
         }
 
         template<std::ranges::range R> 
@@ -205,10 +211,10 @@ namespace crypto12381::detail
         friend constexpr auto product(std::type_identity<G2Point>, R&& r) 
         {
             G2Point result;
-            BLS12381::ECP2_inf(result.data_);
+            miracl_core::get_infinity(result.data_);
             for(auto&& p : std::forward<R>(r))
             {
-                BLS12381::ECP2_add(result.data_, p.G2_point().data_);
+                miracl_core::add(result.data_, p.G2_point().data_);
             }
             return result;
         }
@@ -224,7 +230,7 @@ namespace crypto12381::detail
             static G2Point point = []()
             {
                 G2Point g2;
-                BLS12381::ECP2_generator(g2.data_);
+                miracl_core::get_default_generator(g2.data_);
                 return g2;
             }();
 

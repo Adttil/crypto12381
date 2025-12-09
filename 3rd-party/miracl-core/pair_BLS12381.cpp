@@ -873,7 +873,7 @@ static void BLS12381::gs(BIG u[4], BIG ee)
 }
 
 /* Multiply P by e in group G1 */
-void BLS12381::PAIR_G1mul(ECP *P, BIG e)
+void BLS12381::PAIR_G1mul(ECP *P, const BIG e)
 {
     BIG ee,q;
     BIG_copy(ee,e);
@@ -924,7 +924,7 @@ void BLS12381::PAIR_G1mul(ECP *P, BIG e)
 }
 
 /* Multiply P by e in group G2 */
-void BLS12381::PAIR_G2mul(ECP2 *P, BIG e)
+void BLS12381::PAIR_G2mul(ECP2 *P, const BIG e)
 {
     BIG ee,q;
     BIG_copy(ee,e);

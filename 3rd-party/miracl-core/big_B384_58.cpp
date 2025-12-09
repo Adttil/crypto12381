@@ -168,7 +168,7 @@ chunk B384_58::BIG_dcmove(volatile DBIG f, DBIG g, int d)
 
 /* convert BIG to/from bytes */
 /* SU= 64 */
-void B384_58::BIG_toBytes(char *b, BIG a)
+void B384_58::BIG_toBytes(char *b, const BIG a)
 {
     int i;
     BIG c;
@@ -182,7 +182,7 @@ void B384_58::BIG_toBytes(char *b, BIG a)
 }
 
 /* SU= 16 */
-void B384_58::BIG_fromBytes(BIG a, char *b)
+void B384_58::BIG_fromBytes(BIG a, const char *b)
 {
     int i;
     BIG_zero(a);
@@ -196,7 +196,7 @@ void B384_58::BIG_fromBytes(BIG a, char *b)
 #endif
 }
 
-void B384_58::BIG_fromBytesLen(BIG a, char *b, int s)
+void B384_58::BIG_fromBytesLen(BIG a, const char *b, int s)
 {
     int i, len = s;
     BIG_zero(a);
@@ -252,7 +252,7 @@ void B384_58::BIG_drawoutput(DBIG a)
 }
 
 /* Copy b=a */
-void B384_58::BIG_copy(BIG b, BIG a)
+void B384_58::BIG_copy(BIG b, const BIG a)
 {
     int i;
     for (i = 0; i < NLEN_B384_58; i++)
@@ -275,7 +275,7 @@ void B384_58::BIG_rcopy(BIG b, const BIG a)
 }
 
 /* double length DBIG copy b=a */
-void B384_58::BIG_dcopy(DBIG b, DBIG a)
+void B384_58::BIG_dcopy(DBIG b, const DBIG a)
 {
     int i;
     for (i = 0; i < DNLEN_B384_58; i++)
@@ -287,7 +287,7 @@ void B384_58::BIG_dcopy(DBIG b, DBIG a)
 }
 
 /* Copy BIG to bottom half of DBIG */
-void B384_58::BIG_dscopy(DBIG b, BIG a)
+void B384_58::BIG_dscopy(DBIG b, const BIG a)
 {
     int i;
     for (i = 0; i < NLEN_B384_58 - 1; i++)
@@ -378,7 +378,7 @@ void B384_58::BIG_one(BIG a)
 
 /* Set c=a+b */
 /* SU= 8 */
-void B384_58::BIG_add(BIG c, BIG a, BIG b)
+void B384_58::BIG_add(BIG c, const BIG a, const BIG b)
 {
     int i;
     for (i = 0; i < NLEN_B384_58; i++)
@@ -421,7 +421,7 @@ void B384_58::BIG_inc(BIG c, int d)
 
 /* Set c=a-b */
 /* SU= 8 */
-void B384_58::BIG_sub(BIG c, BIG a, BIG b)
+void B384_58::BIG_sub(BIG c, const BIG a, const BIG b)
 {
     int i;
     for (i = 0; i < NLEN_B384_58; i++)
@@ -567,7 +567,7 @@ void B384_58::BIG_smul(BIG c, BIG a, BIG b)
 
 /* Set c=a*b */
 /* SU= 72 */
-void B384_58::BIG_mul(DBIG c, BIG a, BIG b)
+void B384_58::BIG_mul(DBIG c, const BIG a, const BIG b)
 {
     int i,k;
 #ifdef dchunk
@@ -1101,7 +1101,7 @@ void B384_58::BIG_dshr(DBIG a, int k)
 /* Split DBIG d into two BIGs t|b. Split happens at n bits, where n falls into NLEN_B384_58 word */
 /* d MUST be normalised */
 /* SU= 24 */
-chunk B384_58::BIG_split(BIG t, BIG b, DBIG d, int n)
+chunk B384_58::BIG_split(BIG t, BIG b, const DBIG d, int n)
 {
     int i;
     chunk nw, carry = 0;
@@ -1189,7 +1189,7 @@ void B384_58::BIG_dnorm(DBIG a)
 /* a and b MUST be normalised before call */
 /* sodium constant time implementation */
 
-int B384_58::BIG_comp(BIG a, BIG b)
+int B384_58::BIG_comp(const BIG a, const BIG b)
 {
     int i;
     chunk gt=0; chunk eq=1;
@@ -1215,7 +1215,7 @@ int B384_58::BIG_dcomp(DBIG a, DBIG b)
 
 /* return number of bits in a */
 /* SU= 8 */
-int B384_58::BIG_nbits(BIG a)
+int B384_58::BIG_nbits(const BIG a)
 {
     int bts, k = NLEN_B384_58 - 1;
     BIG t;
@@ -1235,7 +1235,7 @@ int B384_58::BIG_nbits(BIG a)
 }
 
 /* SU= 8, Calculate number of bits in a DBIG - output normalised */
-int B384_58::BIG_dnbits(DBIG a)
+int B384_58::BIG_dnbits(const DBIG a)
 {
     int bts, k = DNLEN_B384_58 - 1;
     DBIG t;
@@ -1256,7 +1256,7 @@ int B384_58::BIG_dnbits(DBIG a)
 
 // Set b=b mod m in constant time (if bd is known at compile time)
 // bd is Max number of bits in b - Actual number of bits in m
-void B384_58::BIG_ctmod(BIG b, BIG m, int bd)
+void B384_58::BIG_ctmod(BIG b, const BIG m, int bd)
 {
     int k=bd;
     BIG r,c;
@@ -1276,7 +1276,7 @@ void B384_58::BIG_ctmod(BIG b, BIG m, int bd)
 
 /* Set b=b mod m */
 /* SU= 16 */
-void B384_58::BIG_mod(BIG b, BIG m)
+void B384_58::BIG_mod(BIG b, const BIG m)
 {
     int k=BIG_nbits(b)-BIG_nbits(m);
     if (k<0) k=0;
@@ -1312,7 +1312,7 @@ void B384_58::BIG_mod(BIG b, BIG m)
 
 // Set a=b mod m in constant time (if bd is known at compile time)
 // bd is Max number of bits in b - Actual number of bits in m
-void B384_58::BIG_ctdmod(BIG a, DBIG b, BIG m, int bd)
+void B384_58::BIG_ctdmod(BIG a, DBIG b, const BIG m, int bd)
 {
     int k=bd;
     DBIG c,r;
@@ -1333,7 +1333,7 @@ void B384_58::BIG_ctdmod(BIG a, DBIG b, BIG m, int bd)
 
 /* Set a=b mod c, b is destroyed. Slow but rarely used. */
 /* SU= 96 */
-void B384_58::BIG_dmod(BIG a, DBIG b, BIG m)
+void B384_58::BIG_dmod(BIG a, DBIG b, const BIG m)
 {
     int k=BIG_dnbits(b)-BIG_nbits(m);
     if (k<0) k=0;
@@ -1373,7 +1373,7 @@ void B384_58::BIG_dmod(BIG a, DBIG b, BIG m)
 
 // a=b/m  in constant time (if bd is known at compile time)
 // bd is Max number of bits in b - Actual number of bits in m
-void B384_58::BIG_ctddiv(BIG a,DBIG b,BIG m,int bd)
+void B384_58::BIG_ctddiv(BIG a,DBIG b,const BIG m,int bd)
 {
     int d,k=bd;
     DBIG c,dr;
@@ -1407,7 +1407,7 @@ void B384_58::BIG_ctddiv(BIG a,DBIG b,BIG m,int bd)
 
 /* Set a=b/c,  b is destroyed. Slow but rarely used. */
 /* SU= 136 */
-void B384_58::BIG_ddiv(BIG a, DBIG b, BIG m)
+void B384_58::BIG_ddiv(BIG a, DBIG b, const BIG m)
 {
     int k=BIG_dnbits(b)-BIG_nbits(m);
     if (k<0) k=0;
@@ -1572,7 +1572,7 @@ void B384_58::BIG_random(BIG m, csprng *rng)
 
 extern int NFILLPOOL;
 
-void B384_58::BIG_randomnum(BIG m, BIG q, csprng *rng)
+void B384_58::BIG_randomnum(BIG m, const BIG q, csprng *rng)
 {
     int i, b, j = 0, r = 0;
     int n=2 * BIG_nbits(q);
@@ -1634,7 +1634,7 @@ void B384_58::BIG_modsqr(BIG r, BIG a1, BIG m)
 
 /* Set r=-a mod m */
 /* SU= 16 */
-void B384_58::BIG_modneg(BIG r, BIG a1, BIG m)
+void B384_58::BIG_modneg(BIG r, const BIG a1, const BIG m)
 {
     BIG a;
     BIG_copy(a, a1);
@@ -1824,7 +1824,7 @@ void B384_58::BIG_invmod2m(BIG a)
 // NOTE: This function is NOT side-channel safe
 // If a is a secret then ALWAYS calculate 1/a = m*(1/am) mod p 
 // where m is a random masking value
-void B384_58::BIG_invmodp(BIG r, BIG a, BIG p)
+void B384_58::BIG_invmodp(BIG r, BIG a, const BIG p)
 {
     BIG u, v, x1, x2, t, one;
     int par,s;
@@ -1900,7 +1900,7 @@ void B384_58::BIG_mod2m(BIG x, int m)
 
 // new
 /* Convert to DBIG number from byte array of given length */
-void B384_58::BIG_dfromBytesLen(DBIG a, char *b, int s)
+void B384_58::BIG_dfromBytesLen(DBIG a, const char *b, int s)
 {
     int i, len = s;
     BIG_dzero(a);

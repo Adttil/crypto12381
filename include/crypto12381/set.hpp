@@ -7,7 +7,7 @@
 #include <type_traits>
 #include <ranges>
 
-#include <miracl-core/core.h>
+#include "miracl_core_interface.hpp"
 
 #include "general.hpp"
 #include "random.hpp"
@@ -321,7 +321,7 @@ namespace crypto12381::detail
 
         hash_state() noexcept
         {
-            core::SHA3_init(&state_, hash_size);
+            miracl_core::sha3_init(state_, hash_size);
         }
         
         template<typename T>
@@ -333,7 +333,7 @@ namespace crypto12381::detail
         
         void to(std::span<char, hash_size> bytes)&& noexcept
         {
-            core::SHA3_hash(&state_, bytes.data());
+            miracl_core::sha3_hash(state_, bytes.data());
         }
 
         auto to()&& noexcept
@@ -356,7 +356,7 @@ namespace crypto12381::detail
         {
             for(const auto& byte : bytes)
             {
-                core::SHA3_process(&state_, byte);
+                miracl_core::sha3_process(state_, byte);
             }
         }
 
@@ -385,7 +385,7 @@ namespace crypto12381::detail
             }
         }
 
-        core::sha3 state_;
+        miracl_core::sha3_state state_;
     };
 
     template<typename...T>

@@ -147,7 +147,7 @@ extern void FP12_inv(FP12 *x, FP12 *y);
 	@param x FP12 instance
 	@param b BIG number
  */
-extern void FP12_pow(FP12 *r, FP12 *x, B384_58::BIG b);
+extern void FP12_pow(FP12 *r, FP12 *x, const B384_58::BIG b);
 /**	@brief Raises an FP12 instance x to a small integer power, side-channel resistant
  *
 	@param x FP12 instance, on exit = x^i

@@ -8,8 +8,7 @@
 #include <limits>
 #include <vector>
 
-#include <miracl-core/bls_BLS12381.h>
-#include <miracl-core/randapi.h>
+#include "miracl_core_interface.hpp"
 
 #include "general.hpp"
 #include "interface.hpp"
@@ -21,8 +20,6 @@
 
 namespace crypto12381 
 {
-    using chunk_t = std::int64_t;
-
     template<typename T>
     concept Zp_element = element_of<T, Zp>;
 }
@@ -68,14 +65,12 @@ namespace crypto12381::detail
     inline constexpr chunk_t chunk_max_limit = ((chunk_t)1 << (rest_bits - 1)) - 1;
     inline constexpr chunk_t chunk_min_limit = -chunk_max_limit;
     
-    inline constexpr size_t n_chunks = 7uz;
     inline constexpr size_t bytes_size = n_chunks * sizeof(chunk_t);
     inline constexpr size_t head_bits = n_chunks * base_bits - p_bits + rest_bits;
     inline constexpr chunk_t head_max_limit = ((chunk_t)1 << (head_bits - 1)) - 1;
     inline constexpr chunk_t head_min_limit = -head_max_limit;
 
     
-    inline constexpr size_t n_chunks2 = n_chunks * 2;
     inline constexpr size_t bytes_size2 = bytes_size * 2;
     inline constexpr size_t head_bits2 = n_chunks2 * base_bits - p_bits * 2 + rest_bits;
     inline constexpr chunk_t head_max_limit2 = ((chunk_t)1 << (head_bits2 - 1)) - 1;
@@ -91,9 +86,14 @@ namespace crypto12381::detail
     
     struct ZpNumberData
     {
-        chunk_t chunks[n_chunks];
+        miracl_core::big chunks;
 
-        constexpr operator chunk_t*() noexcept
+        constexpr operator miracl_core::big&() noexcept
+        {
+            return chunks;
+        } 
+
+        constexpr operator const miracl_core::big&()const noexcept
         {
             return chunks;
         } 
@@ -133,13 +133,11 @@ namespace crypto12381::detail
         thread_local auto invp2m = [](){
             ZpNumberData invp2m;
 
-            BLS12381_BIG::DBIG r{};
-            BLS12381_BIG::BIG_one(r);
-            BLS12381_BIG::BIG_dshl(r, p_bits);
-            
-            BLS12381_BIG::BIG_ddiv(invp2m, r, p());
-            BLS12381_BIG::BIG_inc(invp2m, 1);
-            BLS12381_BIG::BIG_norm(invp2m);
+            miracl_core::big2 r{ 1 };
+            miracl_core::shift_left(r, p_bits);
+            miracl_core::divide(invp2m, r, p());
+            miracl_core::increase(invp2m, 1);
+            miracl_core::normalize(invp2m);
 
             return invp2m;
         }();
@@ -149,9 +147,14 @@ namespace crypto12381::detail
 
     struct ZpNumber2Data
     {
-        chunk_t chunks[n_chunks2];
+        miracl_core::big2 chunks;
 
-        constexpr operator chunk_t*() noexcept
+        constexpr operator miracl_core::big2&() noexcept
+        {
+            return chunks;
+        } 
+
+        constexpr operator const miracl_core::big2&()const noexcept
         {
             return chunks;
         } 
@@ -197,10 +200,8 @@ namespace crypto12381::detail
 
         constexpr explicit ZpNumber(serialized_view<Zp> bytes) requires(Rest.contains(default_range))
         {
-            serialized_field<Zp> buffer;
-            std::memcpy(buffer.data(), bytes.data(), serialized_size<Zp>);
-            BLS12381_BIG::BIG_fromBytes(data_, buffer.data());
-            if(BLS12381_BIG::BIG_comp(data_, p()) >= 0)
+            miracl_core::from_bytes(data_, bytes.data());
+            if(miracl_core::compare(data_, p()) >= 0)
             {
                 throw std::runtime_error{ "Parse to Zp number over range." };
             }
@@ -211,24 +212,22 @@ namespace crypto12381::detail
 
         void serialize(std::span<char, serialized_size<Zp>> bytes) const noexcept
         {
-            BLS12381_BIG::BIG_toBytes(bytes.data(), auto{ data_ });
+            miracl_core::to_bytes(bytes.data(), data_);
         }
 
         static constexpr ZpNumber<Head, Rest> select(RandomEngine& random_engine) noexcept
         {
-            const auto rng = (core::csprng*)random_engine.impl();
             ZpNumber<Head, Rest> result;
-            BLS12381_BIG::BIG_randomnum(result.data_, p(), rng);
+            miracl_core::random_in(result.data_, p(), random_engine);
             return result;
         }
 
         static constexpr ZpNumber<Head, Rest> select_except0(RandomEngine& random_engine) noexcept
         {
-            const auto rng = (core::csprng*)random_engine.impl();
             ZpNumber<Head, Rest> result;
-            BLS12381_BIG::BIG_randomnum(result.data_, prev_p(), rng);
-            BLS12381_BIG::BIG_inc(result.data_, 1);
-            BLS12381_BIG::BIG_norm(result.data_);
+            miracl_core::random_in(result.data_, prev_p(), random_engine);
+            miracl_core::increase(result.data_, 1);
+            miracl_core::normalize(result.data_);
             return result;
         }
 
@@ -270,43 +269,49 @@ namespace crypto12381::detail
             auto& x = data(result);
             x = data_;
 
-            BLS12381_BIG::DBIG dbig;
-            BLS12381_BIG::BIG_mul(dbig, x, invp2m());
+            miracl_core::big2 dbig;
+            miracl_core::multiply(dbig, x, invp2m());
 
-            BLS12381_BIG::BIG low_part;
-            BLS12381_BIG::BIG high_part;
-            BLS12381_BIG::BIG_split(high_part, low_part, dbig, p_bits);
+            miracl_core::big low_part;
+            miracl_core::big high_part;
+            miracl_core::split(high_part, low_part, dbig, p_bits);
 
-            BLS12381_BIG::BIG_mul(dbig, high_part, p());
+            miracl_core::multiply(dbig, high_part, p());
 
-            BLS12381_BIG::BIG_sub(x, x, dbig);
-            BLS12381_BIG::BIG_norm(x);
-
-            if(BLS12381_BIG::BIG_comp(x, p()) == 1)
+            for(size_t i = 0; i < n_chunks; ++i)
             {
-                BLS12381_BIG::BIG_sub(x, x, p());
-                BLS12381_BIG::BIG_norm(x);
+                x[i] -= dbig[i];
+            }
+            miracl_core::normalize(x);
+
+            if(miracl_core::compare(x, p()) == 1)
+            {
+                for(size_t i = 0; i < n_chunks; ++i)
+                {
+                    x[i] -= p()[i];
+                }
+                miracl_core::normalize(x);
             }
 
             return result;
         }
 
-        void show() const
-        {
-            if constexpr(default_range.contains(Head))
-            {
-                BLS12381_BIG::BIG_output(auto{ data_ });
-            }
-            else
-            {
-                BLS12381_BIG::BIG_output(data(normalize()));
-            }
-        }
+        // void show() const
+        // {
+        //     if constexpr(default_range.contains(Head))
+        //     {
+        //         BLS12381_BIG::BIG_output(auto{ data_ });
+        //     }
+        //     else
+        //     {
+        //         BLS12381_BIG::BIG_output(data(normalize()));
+        //     }
+        // }
 
         friend constexpr auto operator-(const ZpNumber& self) noexcept
         {
             auto result = data.create<ZpNumber<>>();
-            BLS12381_BIG::BIG_modneg(data(result), data(self.Zp_number()), p());
+            miracl_core::mod_negate(data(result), self.data_, p());
             return result;
 
             // Error in some case
@@ -336,7 +341,7 @@ namespace crypto12381::detail
         friend constexpr auto inverse(const ZpNumber& self) noexcept
         {
             auto result = data.create<ZpNumber<>>(self.data_);
-            BLS12381_BIG::BIG_invmodp(data(result), data(result), p());
+            miracl_core::mod_inverse(data(result), data(result), p());
             return result;
         }
 
@@ -410,7 +415,7 @@ namespace crypto12381::detail
             constexpr auto head = Head * RHead;
             static_assert(head_range_extrem2.contains(head), "head overflow");
             auto result = data.create<ZpNumber2<head>>();
-            BLS12381_BIG::BIG_mul(data(result), auto{ l.data_ }, data(auto{ r }));
+            miracl_core::multiply(data(result), l.data_ , data(r));
             return result;
         }
 
@@ -423,17 +428,17 @@ namespace crypto12381::detail
         template<ChunkRange RHead, ChunkRange RRest>
         friend constexpr bool operator==(const ZpNumber& l, const ZpNumber<RHead, RRest>& r) noexcept
         {
-            return BLS12381_BIG::BIG_comp(data(l.normalize()), data(r.normalize())) == 0;
+            return miracl_core::compare(data(l.normalize()), data(r.normalize())) == 0;
         }
 
         static Zp_normalized_t from_hash(hash_state&& state) noexcept
         requires std::same_as<ZpNumber<>, Zp_normalized_t>
         {
-            auto hash_bytes = std::move(state).to();
-            BLS12381_BIG::DBIG dbig;
-            BLS12381_BIG::BIG_dfromBytesLen(dbig, hash_bytes.data(), hash_state::hash_size);
+            const auto hash_bytes = std::move(state).to();
+            miracl_core::big2 dbig;
+            miracl_core::from_bytes(dbig, hash_bytes.data(), hash_state::hash_size);
             Zp_normalized_t result;
-            BLS12381_BIG::BIG_ctdmod(result.data_, dbig, p(), hash_state::hash_size * 8 - 255);
+            miracl_core::fixed_time_mod(result.data_, dbig, p(), hash_state::hash_size * 8 - 255);
             return result;
         }
 
@@ -566,20 +571,20 @@ namespace crypto12381::detail
         constexpr ZpNumber<> normalize() const
         {
             auto result = data.create<ZpNumber<>>();
-            BLS12381_BIG::BIG_dmod(data(result), auto{ data_ }, p());
+            miracl_core::mod(data(result), auto{ data_ }, p());
             return result;
         }
 
-        void show() const
-        {
-            BLS12381_BIG::BIG_output(data(normalize()));
-        }
+        // void show() const
+        // {
+        //     BLS12381_BIG::BIG_output(data(normalize()));
+        // }
 
         constexpr auto operator-() const
         {
             auto result = data.create<ZpNumber<>>();
-            BLS12381_BIG::BIG_dmod(data(result), data(Zp_number()), p());
-            BLS12381_BIG::BIG_modneg(data(result), data(result), p());
+            miracl_core::mod(data(result), data(Zp_number()), p());
+            miracl_core::mod_negate(data(result), data(result), p());
             return result;
 
             // Error in some case

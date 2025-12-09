@@ -13,7 +13,7 @@ set(CMAKE_EXE_LINKER_FLAGS "-static")
 file(GLOB crypto12381_srcs "src/*.cpp")
 file(GLOB miracl_core_srcs "3rd-party/miracl-core/*.cpp")
 add_library(crypto12381 STATIC ${crypto12381_srcs} ${miracl_core_srcs})
-target_include_directories(crypto12381 PUBLIC "include" "3rd-party")
+target_include_directories(crypto12381 PUBLIC "include" PRIVATE "3rd-party")
 
 add_executable(example_ps "example_ps.cpp")
 target_link_libraries(example_ps PRIVATE crypto12381)

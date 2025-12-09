@@ -343,7 +343,7 @@ extern void ECP_cfp(ECP *Q);
 	@param Q ECP instance 
 	@param x Fp derived from hash
  */
-extern void ECP_map2point(ECP *Q, BLS12381::FP *x);
+extern void ECP_map2point(ECP *Q, const BLS12381::FP *x);
 
 /**	@brief Maps random BIG to curve point using hunt-and-peck
  *

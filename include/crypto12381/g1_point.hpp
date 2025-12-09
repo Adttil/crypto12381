@@ -3,7 +3,8 @@
 
 #include <cstring>
 #include <tuple>
-#include <miracl-core/bls_BLS12381.h>
+
+#include "miracl_core_interface.hpp"
 
 #include "general.hpp"
 #include "zp_number.hpp"
@@ -49,11 +50,16 @@ namespace crypto12381::detail
 
     struct G1PointData
     {
-        BLS12381::ECP ecp;
+        miracl_core::point1 ecp;
 
-        constexpr operator BLS12381::ECP*()
+        constexpr operator miracl_core::point1&()
         {
-            return &ecp;
+            return ecp;
+        }
+
+        constexpr operator const miracl_core::point1&() const
+        {
+            return ecp;
         }
     };
 
@@ -81,12 +87,12 @@ namespace crypto12381::detail
         {
             serialized_field<G1> buffer;
             std::memcpy(buffer.data(), bytes.data(), serialized_size<G1>);
-            core::octet buffer_view{
+            miracl_core::bytes_view buffer_view{
                 .len = serialized_size<G1>,
                 .max = serialized_size<G1>,
-                .val = buffer.data()
+                .data = buffer.data()
             };
-            BLS12381::ECP_fromOctet(data_, &buffer_view);
+            miracl_core::from_bytes(data_, buffer_view);
         }
 
         constexpr G1Point(const G1Point&) = default;
@@ -94,12 +100,12 @@ namespace crypto12381::detail
 
         void serialize(std::span<char, serialized_size<G1>> bytes) const noexcept
         {
-            core::octet buffer_view{
+            miracl_core::bytes_view buffer_view{
                 .len = 0,
                 .max = serialized_size<G1>,
-                .val = bytes.data()
+                .data = bytes.data()
             };
-            BLS12381::ECP_toOctet(&buffer_view, auto{ data_ }, true);
+            miracl_core::to_bytes(buffer_view, auto{ data_ }, true);
         }
 
         template<typename Self>
@@ -115,10 +121,10 @@ namespace crypto12381::detail
             }
         }
 
-        void show() const
-        {
-            BLS12381::ECP_output(data(G1_point()));
-        }
+        // void show() const
+        // {
+        //     BLS12381::ECP_output(data(G1_point()));
+        // }
 
         static const G1Point& default_generator() noexcept
         {
@@ -131,13 +137,13 @@ namespace crypto12381::detail
             if constexpr(g1_reusable<Self>)
             {
                 decltype(auto) result = std::forward<Self>(self).G1_point();
-                BLS12381::ECP_neg(data(result));
+                miracl_core::negate(data(result));
                 return result;
             }
             else
             {
                 G1Point result = std::forward<Self>(self).G1_point();
-                BLS12381::ECP_neg(data(result));
+                miracl_core::negate(data(result));
                 return result;
             }
         }
@@ -148,19 +154,19 @@ namespace crypto12381::detail
             if constexpr(g1_reusable<L>)
             {
                 decltype(auto) result = l.G1_point();
-                BLS12381::ECP_add(result.data_, r.G1_point().data_);
+                miracl_core::add(result.data_, r.G1_point().data_);
                 return result;
             }
             else if constexpr(g1_reusable<R>)
             {
                 decltype(auto) result = r.G1_point();
-                BLS12381::ECP_add(result.data_, l.G1_point().data_);
+                miracl_core::add(result.data_, l.G1_point().data_);
                 return result;
             }
             else
             {
                 G1Point result = l.G1_point();
-                BLS12381::ECP_add(result.data_, r.G1_point().data_);
+                miracl_core::add(result.data_, r.G1_point().data_);
                 return result;
             }
         }
@@ -171,13 +177,13 @@ namespace crypto12381::detail
             if constexpr(g1_reusable<L>)
             {
                 decltype(auto) result = l.G1_point();
-                BLS12381::ECP_sub(result.data_, r.G1_point().data_);
+                miracl_core::sub(result.data_, r.G1_point().data_);
                 return result;
             }
             else
             {
                 G1Point result = l.G1_point();
-                BLS12381::ECP_sub(result.data_, r.G1_point().data_);
+                miracl_core::sub(result.data_, r.G1_point().data_);
                 return result;
             }
         }
@@ -191,23 +197,23 @@ namespace crypto12381::detail
         template<G1_element L, G1_element R>
         friend constexpr bool operator==(L&& l, R&& r) noexcept
         {
-            return BLS12381::ECP_equals(data(l.G1_point()), data(r.G1_point())) == 1;
+            return miracl_core::equal(data(l.G1_point()), data(r.G1_point())) == 1;
         }
 
         static G1Point from_hash(hash_state&& state) noexcept
         {
             char hash_bytes[hash_state::hash_size];
             std::move(state).to(hash_bytes);
-            BLS12381_BIG::DBIG dbig;
-            BLS12381_BIG::BIG_dfromBytesLen(dbig, hash_bytes, hash_state::hash_size);
-            BLS12381_BIG::BIG x;
-            BLS12381_BIG::BIG_ctdmod(x, dbig, modulus(), hash_state::hash_size * 8 - 381);
-            BLS12381_FP::FP fp;
-            BLS12381_FP::FP_nres(&fp, x);
+            miracl_core::big2 dbig;
+            miracl_core::from_bytes(dbig, hash_bytes, hash_state::hash_size);
+            miracl_core::big x;
+            miracl_core::fixed_time_mod(x, dbig, modulus(), hash_state::hash_size * 8 - 381);
+            miracl_core::fp fp;
+            miracl_core::residue(fp, x);
 
             G1Point result;
-            BLS12381::ECP_map2point(result.data_, &fp);
-            BLS12381::ECP_cfp(result.data_);
+            miracl_core::map_to_point(result.data_, fp);
+            miracl_core::multiply_cofactor(result.data_);
             return result;
         }
 
@@ -216,10 +222,10 @@ namespace crypto12381::detail
         friend constexpr auto product(std::type_identity<G1Point>, R&& r) 
         {
             G1Point result;
-            BLS12381::ECP_inf(result.data_);
+            miracl_core::get_infinity(result.data_);
             for(auto&& p : std::forward<R>(r))
             {
-                BLS12381::ECP_add(result.data_, p.G1_point().data_);
+                miracl_core::add(result.data_, p.G1_point().data_);
             }
             return result;
         }
@@ -235,7 +241,11 @@ namespace crypto12381::detail
             static G1Point point = []()
             {
                 G1Point g1;
-                BLS12381::ECP_generator(g1.data_);
+                int r = miracl_core::get_default_generator(g1.data_);
+                if(r != 1)
+                {
+                    throw std::runtime_error{ "Failed to get default generator in G1." };
+                }
                 return g1;
             }();
 
@@ -272,21 +282,21 @@ namespace crypto12381::detail
             if constexpr(std::is_rvalue_reference_v<decltype(std::forward<Self>(self).point())>)
             {
                 decltype(auto) result = std::forward<Self>(self).point().G1_point();
-                BLS12381::PAIR_G1mul(data(result), data(std::forward<Self>(self).number().Zp_number()));
+                miracl_core::multiply(data(result), data(std::forward<Self>(self).number().Zp_number()));
                 return result;
             }
             else
             {
                 G1Point result = std::forward<Self>(self).point().G1_point();
-                BLS12381::PAIR_G1mul(data(result), data(std::forward<Self>(self).number().Zp_number()));
+                miracl_core::multiply(data(result), data(std::forward<Self>(self).number().Zp_number()));
                 return result;
             }
         }
 
-        void show() const
-        {
-            BLS12381::ECP_output(data(G1_point()));
-        }
+        // void show() const
+        // {
+        //     BLS12381::ECP_output(data(G1_point()));
+        // }
 
         template<specified<G1Pow> L, G1_element R> requires (not specified<R, G1Point>)
         friend constexpr G1Point operator*(L&& l, R&& r) noexcept
@@ -294,7 +304,7 @@ namespace crypto12381::detail
             if constexpr(g1_reusable<decltype(std::forward<L>(l).point())>)
             {
                 decltype(auto) result = std::forward<L>(l).point().G1_point();
-                BLS12381::ECP_mul2(
+                miracl_core::double_multiply(
                     data(result), 
                     data(std::forward<R>(r).point().G1_point()), 
                     data(std::forward<L>(l).number().Zp_number()),
@@ -305,7 +315,7 @@ namespace crypto12381::detail
             else if constexpr(g1_reusable<decltype(std::forward<R>(r).point())>)
             {
                 decltype(auto) result = std::forward<R>(r).point().G1_point();
-                BLS12381::ECP_mul2(
+                miracl_core::double_multiply(
                     data(result), 
                     data(std::forward<L>(l).point().G1_point()), 
                     data(std::forward<R>(r).number().Zp_number()),
@@ -316,7 +326,7 @@ namespace crypto12381::detail
             else
             {
                 G1Point result = std::forward<L>(l).point().G1_point();
-                BLS12381::ECP_mul2(
+                miracl_core::double_multiply(
                     data(result), 
                     data(std::forward<R>(r).point().G1_point()), 
                     data(std::forward<L>(l).number().Zp_number()),
@@ -347,7 +357,7 @@ namespace crypto12381::detail
         friend constexpr auto product(std::type_identity<G1Pow>, R&& r) 
         {
             auto result = data.create<G1Point>();
-            BLS12381::ECP_inf(data(result));
+            miracl_core::get_infinity(data(result));
             
             const auto sentinel = std::ranges::end(r);
             for(auto iter = std::ranges::begin(r); iter != sentinel; ++iter)
@@ -355,10 +365,10 @@ namespace crypto12381::detail
                 auto iter_prev = iter++;
                 if(iter == sentinel)
                 {
-                    BLS12381::ECP_add(data(result), data((*iter_prev).G1_point()));
+                    miracl_core::add(data(result), data((*iter_prev).G1_point()));
                     break;
                 }
-                BLS12381::ECP_add(data(result), data((*iter_prev * *iter)));
+                miracl_core::add(data(result), data((*iter_prev * *iter)));
             }
 
             return result;

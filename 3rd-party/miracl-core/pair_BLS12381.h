@@ -99,7 +99,7 @@ extern void PAIR_fexp(BLS12381::FP12 *x);
 	@param b BIG multiplier
 
  */
-extern void PAIR_G1mul(ECP *Q, B384_58::BIG b);
+extern void PAIR_G1mul(ECP *Q, const B384_58::BIG b);
 /**	@brief Fast point multiplication of a member of the group G2 by a BIG number
  *
 	May exploit endomorphism for speed.
@@ -107,7 +107,7 @@ extern void PAIR_G1mul(ECP *Q, B384_58::BIG b);
 	@param b BIG multiplier
 
  */
-extern void PAIR_G2mul(ECP2 *P, B384_58::BIG b);
+extern void PAIR_G2mul(ECP2 *P, const B384_58::BIG b);
 
 
 

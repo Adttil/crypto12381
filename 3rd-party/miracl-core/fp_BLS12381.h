@@ -113,7 +113,7 @@ extern void FP_zero(FP *x);
 	@param y FP number to be copied to
 	@param x FP to be copied from
  */
-extern void FP_copy(FP *y, FP *x);
+extern void FP_copy(FP *y, const FP *x);
 
 /**	@brief Copy from ROM to an FP
  *
@@ -153,7 +153,7 @@ extern void FP_cmove(FP *x, FP *y, int s);
 	@param x BIG number to be converted
 	@param y FP result
  */
-extern void FP_nres(FP *y, B384_58::BIG x);
+extern void FP_nres(FP *y, const B384_58::BIG x);
 /**	@brief Converts from residue form back to BIG integer form
  *
 	@param y FP number to be converted to BIG
@@ -193,7 +193,7 @@ extern void FP_modmul(B384_58::BIG, B384_58::BIG, B384_58::BIG);
 	@param y FP number, the multiplicand
 	@param z FP number, the multiplier
  */
-extern void FP_mul(FP *x, FP *y, FP *z);
+extern void FP_mul(FP *x, FP *y, const FP *z);
 /**	@brief Fast Modular multiplication of an FP, by a small integer, mod Modulus
  *
 	@param x FP number, on exit the modular product = y*i mod Modulus

@@ -733,7 +733,7 @@ void BLS12381::FP12_compow(FP4 *c, FP12 *x, BIG e, BIG r)
 /* Note this is simple square and multiply, so not side-channel safe */
 /* But fast for final exponentiation where exponent is not a secret */
 
-void BLS12381::FP12_pow(FP12 *r, FP12 *a, BIG b)
+void BLS12381::FP12_pow(FP12 *r, FP12 *a, const BIG b)
 {
     FP12 w, sf;
     BIG b1, b3;

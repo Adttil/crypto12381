@@ -96,7 +96,14 @@ void sequentail_aggregate()
 
 int main()
 {
+    try
+    {
     single_message();
     multi_message();
     sequentail_aggregate();
+    }
+    catch(std::exception& e)
+    {
+        std::cout << e.what() << '\n';
+    }
 }

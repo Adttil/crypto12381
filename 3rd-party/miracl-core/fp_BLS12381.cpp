@@ -220,7 +220,7 @@ void BLS12381::FP_mod(BIG a, DBIG d)
 #if MODTYPE_BLS12381 == NOT_SPECIAL
 
 /* convert to Montgomery n-residue form */
-void BLS12381::FP_nres(FP *y, BIG x)
+void BLS12381::FP_nres(FP *y, const BIG x)
 {
     DBIG d;
     BIG r;
@@ -285,7 +285,7 @@ int BLS12381::FP_isunity(FP *x)
     return BIG_isunity(m);
 }
 
-void BLS12381::FP_copy(FP *y, FP *x)
+void BLS12381::FP_copy(FP *y, const FP *x)
 {
     BIG_copy(y->g, x->g);
     y->XES = x->XES;
@@ -393,7 +393,7 @@ int tdadd = 0, rdadd = 0, tdneg = 0, rdneg = 0;
 /* r=a*b mod Modulus */
 /* product must be less that p.R - and we need to know this in advance! */
 /* SU= 88 */
-void BLS12381::FP_mul(FP *r, FP *a, FP *b)
+void BLS12381::FP_mul(FP *r, FP *a, const FP *b)
 {
     DBIG d;
 

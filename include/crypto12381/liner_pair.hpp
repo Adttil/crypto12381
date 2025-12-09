@@ -1,6 +1,8 @@
 #ifndef CRYPTO12381_LINER_PAIR_HPP
 #define CRYPTO12381_LINER_PAIR_HPP
 
+#include "miracl_core_interface.hpp"
+
 #include "g1_point.hpp"
 #include "g2_point.hpp"
 
@@ -38,11 +40,16 @@ namespace crypto12381::detail
 
     struct GTPointData
     {
-        BLS12381::FP12 fp;
+        miracl_core::fp12 fp;
 
-        constexpr operator BLS12381::FP12*() noexcept
+        constexpr operator miracl_core::fp12&() noexcept
         {
-            return &fp;
+            return fp;
+        }
+
+        constexpr operator const miracl_core::fp12&()const noexcept
+        {
+            return fp;
         }
     };
 
@@ -55,12 +62,12 @@ namespace crypto12381::detail
 
         void serialize(std::span<char, serialized_size<GT>> bytes) const noexcept
         {
-            core::octet buffer_view{
+            miracl_core::bytes_view buffer_view{
                 .len = 0,
                 .max = serialized_size<GT>,
-                .val = bytes.data()
+                .data = bytes.data()
             };
-            BLS12381::FP12_toOctet(&buffer_view, auto{ data_ });
+            miracl_core::to_bytes(buffer_view, auto{ data_ });
         }
 
         template<typename Self>
@@ -76,10 +83,10 @@ namespace crypto12381::detail
             }
         }
 
-        void show() const
-        {
-            BLS12381::FP12_output(data(GT_point()));
-        }
+        // void show() const
+        // {
+        //     BLS12381::FP12_output(data(GT_point()));
+        // }
 
         template<GT_element Self>
         friend constexpr GTPoint inverse(Self&& self) noexcept
@@ -87,13 +94,13 @@ namespace crypto12381::detail
             if constexpr(gt_reusable<Self>)
             {
                 decltype(auto) result = std::forward<Self>(self).GT_point();
-                BLS12381::FP12_inv(result.data_, result.data_);
+                miracl_core::inverse(result.data_, result.data_);
                 return result;
             }
             else
             {
                 GTPoint result = std::forward<Self>(self).GT_point();
-                BLS12381::FP12_inv(result.data_, result.data_);
+                miracl_core::inverse(result.data_, result.data_);
                 return result;
             }
         }
@@ -104,19 +111,19 @@ namespace crypto12381::detail
             if constexpr(gt_reusable<L>)
             {
                 decltype(auto) result = l.GT_point();
-                BLS12381::FP12_mul(result.data_, r.GT_point().data_);
+                miracl_core::multiply(result.data_, r.GT_point().data_);
                 return result;
             }
             else if constexpr(gt_reusable<R>)
             {
                 decltype(auto) result = r.GT_point();
-                BLS12381::FP12_mul(result.data_, l.GT_point().data_);
+                miracl_core::multiply(result.data_, l.GT_point().data_);
                 return result;
             }
             else
             {
                 GTPoint result = l.GT_point();
-                BLS12381::FP12_mul(result.data_, r.GT_point().data_);
+                miracl_core::multiply(result.data_, r.GT_point().data_);
                 return result;
             }
         }
@@ -133,13 +140,13 @@ namespace crypto12381::detail
             if constexpr(gt_reusable<P>)
             {
                 decltype(auto) result = std::forward<P>(point).GT_point();
-                BLS12381::FP12_pow(result.data_, result.data_, data(std::forward<V>(number).Zp_number()));
+                miracl_core::pow(result.data_, result.data_, data(std::forward<V>(number).Zp_number()));
                 return result;
             }
             else
             {
                 GTPoint result = std::forward<P>(point).GT_point();
-                BLS12381::FP12_pow(result.data_, result.data_, data(std::forward<V>(number).Zp_number()));
+                miracl_core::pow(result.data_, result.data_, data(std::forward<V>(number).Zp_number()));
                 return result;
             }
         }
@@ -147,7 +154,7 @@ namespace crypto12381::detail
         template<specified<GTPoint> L, GT_element R>
         friend constexpr bool operator==(L&& l, R&& r) noexcept
         {
-            return BLS12381::FP12_equals(data(l.GT_point()), data(r.GT_point())) == 1;
+            return miracl_core::equal(data(l.GT_point()), data(r.GT_point())) == 1;
         }
 
     private:
@@ -179,32 +186,32 @@ namespace crypto12381::detail
         constexpr GTPoint GT_point(this Self&& self) noexcept
         {
             auto result = data.create<GTPoint>();
-            BLS12381::PAIR_ate(
+            miracl_core::pair_ate(
                 data(result),
                 data(std::forward<Self>(self).p2().G2_point()), 
                 data(std::forward<Self>(self).p1().G1_point())
             );
-            BLS12381::PAIR_fexp(data(result));
+            miracl_core::pair_final_exponentiation(data(result));
             return result;
         }
 
-        void show() const
-        {
-            BLS12381::FP12_output(data(GT_point()));
-        }
+        // void show() const
+        // {
+        //     BLS12381::FP12_output(data(GT_point()));
+        // }
 
         template<specified<GTPair> L, GT_element R> requires (not specified<R, GTPoint>)
         friend constexpr GTPoint operator*(L&& l, R&& r) noexcept
         {
             auto result = data.create<GTPoint>();
-            BLS12381::PAIR_double_ate(
+            miracl_core::pair_double_ate(
                 data(result),
                 data(std::forward<L>(l).p2().G2_point()), 
                 data(std::forward<L>(l).p1().G1_point()), 
                 data(std::forward<R>(r).p2().G2_point()), 
                 data(std::forward<R>(r).p1().G1_point())
             );
-            BLS12381::PAIR_fexp(data(result));
+            miracl_core::pair_final_exponentiation(data(result));
             return result;
         }
 
@@ -217,7 +224,7 @@ namespace crypto12381::detail
         template<specified<GTPair> L, GT_element R>
         friend constexpr bool operator==(L&& l, R&& r) noexcept
         {
-            return BLS12381::FP12_equals(data(l.GT_point()), data(r.GT_point())) == 1;
+            return miracl_core::equal(data(l.GT_point()), data(r.GT_point())) == 1;
         }
     private:
         constexpr explicit GTPair(P1&& p1, P2&& p2) noexcept

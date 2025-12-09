@@ -137,27 +137,27 @@ extern chunk BIG_dcmove(volatile BIG x, BIG y, int s);
 	@param a byte array
 	@param x BIG number
  */
-extern void BIG_toBytes(char *a, BIG x);
+extern void BIG_toBytes(char *a, const BIG x);
 /**	@brief Convert to BIG number from byte array (Constant Time)
  *
 	@param x BIG number
 	@param a byte array
  */
-extern void BIG_fromBytes(BIG x, char *a);
+extern void BIG_fromBytes(BIG x, const char *a);
 /**	@brief Convert to BIG number from byte array of given length (Variable Time)
  *
 	@param x BIG number
 	@param a byte array
 	@param s byte array length
  */
-extern void BIG_fromBytesLen(BIG x, char *a, int s);
+extern void BIG_fromBytesLen(BIG x, const char *a, int s);
 /**@brief Convert to DBIG number from byte array of given length (Variable Time)
  *
    @param x DBIG number
    @param a byte array
    @param s byte array length
  */
-extern void BIG_dfromBytesLen(DBIG x, char *a, int s);
+extern void BIG_dfromBytesLen(DBIG x, const char *a, int s);
 /**	@brief Outputs a DBIG number to the console  (Variable Time)
  *
 	@param x a DBIG number
@@ -181,13 +181,13 @@ extern void BIG_rcopy(BIG x, const BIG y);
 	@param x BIG number
 	@param y BIG number to be copied
  */
-extern void BIG_copy(BIG x, BIG y);
+extern void BIG_copy(BIG x, const BIG y);
 /**	@brief Copy DBIG to another DBIG  (Constant Time)
  *
 	@param x DBIG number
 	@param y DBIG number to be copied
  */
-extern void BIG_dcopy(DBIG x, DBIG y);
+extern void BIG_dcopy(DBIG x, const DBIG y);
 /**	@brief Copy BIG to upper half of DBIG  (Constant Time)
  *
 	@param x DBIG number
@@ -199,7 +199,7 @@ extern void BIG_dsucopy(DBIG x, BIG y);
 	@param x DBIG number
 	@param y BIG number to be copied
  */
-extern void BIG_dscopy(DBIG x, BIG y);
+extern void BIG_dscopy(DBIG x, const BIG y);
 /**	@brief Copy lower half of DBIG to a BIG  (Constant Time)
  *
 	@param x BIG number
@@ -238,7 +238,7 @@ extern void BIG_invmod2m(BIG x);
 	@param y BIG number
 	@param z BIG number
  */
-extern void BIG_add(BIG x, BIG y, BIG z);
+extern void BIG_add(BIG x, const BIG y, const BIG z);
 
 /**	@brief Set BIG to logical or of two BIGs - output not normalised (Constant Time)
  *
@@ -260,7 +260,7 @@ extern void BIG_inc(BIG x, int i);
 	@param y BIG number
 	@param z BIG number
  */
-extern void BIG_sub(BIG x, BIG y, BIG z);
+extern void BIG_sub(BIG x, const BIG y, const BIG z);
 /**	@brief Decrement BIG by a small integer - output not normalised (Constant Time)
  *
 	@param x BIG number to be decremented
@@ -315,7 +315,7 @@ extern void BIG_pxmul(DBIG x, BIG y, int i);
 	@param y BIG number
 	@param z BIG number
  */
-extern void BIG_mul(DBIG x, BIG y, BIG z);
+extern void BIG_mul(DBIG x, const BIG y, const BIG z);
 /**	@brief Multiply BIG by another BIG resulting in another BIG - inputs normalised and output normalised (Constant Time)
  *
 	Note that the product must fit into a BIG, and x must be distinct from y and z
@@ -401,7 +401,7 @@ extern void BIG_dshr(DBIG x, int s);
 	@param s Bit position at which to split
 	@return carry-out from top half
  */
-extern chunk BIG_split(BIG x, BIG y, DBIG z, int s);
+extern chunk BIG_split(BIG x, BIG y, const DBIG z, int s);
 /**	@brief Normalizes a BIG number - output normalised (Constant Time)
  *
 	All digits of the input BIG are reduced mod 2^BASEBITS
@@ -420,7 +420,7 @@ extern void BIG_dnorm(DBIG x);
 	@param y second BIG number to be compared
 	@return -1 is x<y, 0 if x=y, 1 if x>y
  */
-extern int BIG_comp(BIG x, BIG y);
+extern int BIG_comp(const BIG a, const BIG b);
 /**	@brief Compares two DBIG numbers. Inputs must be normalised externally (Constant Time)
  *
 	@param x first DBIG number to be compared
@@ -433,13 +433,13 @@ extern int BIG_dcomp(DBIG x, DBIG y);
 	@param x BIG number
 	@return Number of bits in x
  */
-extern int BIG_nbits(BIG x);
+extern int BIG_nbits(const BIG x);
 /**	@brief Calculate number of bits in a DBIG - output normalised (Variable Time)
  *
 	@param x DBIG number
 	@return Number of bits in x
  */
-extern int BIG_dnbits(DBIG x);
+extern int BIG_dnbits(const DBIG x);
 
 /**	@brief Reduce x mod n - constant time for fixed bd
  *
@@ -448,7 +448,7 @@ extern int BIG_dnbits(DBIG x);
 	@param n The modulus
     @param bd non-negative bit difference between maximum x and n
  */
-extern void BIG_ctmod(BIG x, BIG n, int bd);
+extern void BIG_ctmod(BIG x, const BIG n, int bd);
 
 /**	@brief  x=y mod n - constant time for fixed bd
  *
@@ -458,7 +458,7 @@ extern void BIG_ctmod(BIG x, BIG n, int bd);
 	@param n Modulus
     @param bd non-negative bit difference between maximum y and n
  */
-extern void BIG_ctdmod(BIG x, DBIG y, BIG n, int bd);
+extern void BIG_ctdmod(BIG x, DBIG y, const BIG n, int bd);
 
 /**	@brief Divide x by n - constant time for fixed bd
  *
@@ -477,7 +477,7 @@ extern void BIG_ctsdiv(BIG x,BIG n,int bd);
 	@param n Modulus
     @param bd non-negative bit difference between maximum y and n
  */
-extern void BIG_ctddiv(BIG x, DBIG y, BIG n,int bd);
+extern void BIG_ctddiv(BIG x, DBIG y, const BIG n,int bd);
 
 
 /**	@brief Reduce x mod n - input and output normalised (Variable Time)
@@ -486,7 +486,7 @@ extern void BIG_ctddiv(BIG x, DBIG y, BIG n,int bd);
 	@param x BIG number to be reduced mod n
 	@param n The modulus
  */
-extern void BIG_mod(BIG x, BIG n);
+extern void BIG_mod(BIG x, const BIG n);
 /**	@brief Divide x by n - output normalised (Variable Time)
  *
 	Slow but rarely used
@@ -501,7 +501,7 @@ extern void BIG_sdiv(BIG x, BIG n);
 	@param y DBIG number
 	@param n Modulus
  */
-extern void BIG_dmod(BIG x, DBIG y, BIG n);
+extern void BIG_dmod(BIG x, DBIG y, const BIG n);
 /**	@brief  x=y/n - output normalised (Variable Time)
  *
 	Slow but rarely used. y is destroyed.
@@ -509,7 +509,7 @@ extern void BIG_dmod(BIG x, DBIG y, BIG n);
 	@param y DBIG number
 	@param n Modulus
  */
-extern void BIG_ddiv(BIG x, DBIG y, BIG n);
+extern void BIG_ddiv(BIG x, DBIG y, const BIG n);
 /**	@brief  return parity of BIG, that is the least significant bit (Constant Time)
  *
 	@param x BIG number
@@ -544,7 +544,7 @@ extern void BIG_random(BIG x, csprng *r);
 	@param n The modulus
 	@param r A pointer to a Cryptographically Secure Random Number Generator
  */
-extern void BIG_randomnum(BIG x, BIG n, csprng *r);
+extern void BIG_randomnum(BIG x, const BIG n, csprng *r);
 
 /**	@brief  Create an unbiased random BIG from a random number generator, reduced with respect to a modulus and truncated to max bit length (Constant Time as used)
  *
@@ -600,7 +600,7 @@ extern void BIG_modsqr(BIG x, BIG y, BIG n);
 	@param y BIG number
 	@param n The BIG Modulus
  */
-extern void BIG_modneg(BIG x, BIG y, BIG n);
+extern void BIG_modneg(BIG x, const BIG y, const BIG n);
 
 /**	@brief  Calculate x=y+z mod n (Variable Time)
  *
@@ -626,7 +626,7 @@ extern int BIG_jacobi(BIG x, BIG y);
 	@param y BIG number
 	@param n The BIG Modulus
  */
-extern void BIG_invmodp(BIG x, BIG y, BIG n);
+extern void BIG_invmodp(BIG x, BIG y, const BIG n);
 /** @brief Calculate x=x mod 2^m (Variable Time)
  *
 	Truncation

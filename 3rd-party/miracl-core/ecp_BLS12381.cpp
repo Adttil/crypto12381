@@ -1273,7 +1273,7 @@ void BLS12381::ECP_cfp(ECP *P)
 }
 
 /* Constant time Map to Point */
-void BLS12381::ECP_map2point(ECP *P,FP *h)
+void BLS12381::ECP_map2point(ECP *P,const FP *h)
 {
 #if CURVETYPE_BLS12381==MONTGOMERY
 // Elligator 2
