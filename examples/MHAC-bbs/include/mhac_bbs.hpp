@@ -22,11 +22,12 @@ namespace crypto12381::mhac_bbs
 
     IssSetupResult iss_setup(size_t m, RandomEngine& random) noexcept;
 
-    // (A, e_share)
+    // (A, e_share, D)
     struct Cred
     {
         serialized_field<G1> A;
         serialized_field<Zp> e_share;
+        serialized_field<G1> D;
     };
 
     std::vector<Cred> cred_iss(
@@ -34,6 +35,16 @@ namespace crypto12381::mhac_bbs
         const PrivateKey& sk, 
         size_t t, 
         size_t n, 
+        std::span<const serialized_field<Zp>> attributes, 
+        RandomEngine& random
+    );
+
+    std::vector<Cred> cred_iss(
+        const PublicParameters& pp, 
+        const PrivateKey& sk, 
+        size_t t, 
+        std::span<const serialized_field<G1>> commitment,
+        std::span<const size_t> private_indexes,
         std::span<const serialized_field<Zp>> attributes, 
         RandomEngine& random
     );
