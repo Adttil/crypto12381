@@ -111,31 +111,20 @@ namespace crypto12381::detail
         0x3FFFFFF00000001L,0x36900BFFF96FFBFL,0x180809A1D80553BL,0x14CA675F520CCE7L,0x73EDA7L,0x0L,0x0L 
     };
 
-    constexpr ZpNumberData& p() noexcept
-    {
-        thread_local constinit auto p = p_data;
-        return p;
-    }
-
-    constexpr ZpNumberData& prev_p() noexcept
-    {
-        thread_local constinit auto prev_p = [](){ 
-            auto prev_p = p_data;
-            --prev_p[0];
-            return prev_p;
-        }();
-        
+    inline constexpr ZpNumberData prev_p_data = [](){ 
+        auto prev_p = p_data;
+        --prev_p[0];
         return prev_p;
-    }
+    }();
 
-    constexpr ZpNumberData& invp2m() noexcept
+    constexpr const ZpNumberData& invp2m() noexcept
     {
-        thread_local auto invp2m = [](){
+        thread_local const auto invp2m = [](){
             ZpNumberData invp2m;
 
             miracl_core::big2 r{ 1 };
             miracl_core::shift_left(r, p_bits);
-            miracl_core::divide(invp2m, r, p());
+            miracl_core::divide(invp2m, r, p_data);
             miracl_core::increase(invp2m, 1);
             miracl_core::normalize(invp2m);
 
@@ -183,12 +172,6 @@ namespace crypto12381::detail
         0x3FFFFFF00000001L,0x36900BFFF96FFBFL,0x180809A1D80553BL,0x14CA675F520CCE7L,0x73EDA7L,0x0L,0x0L 
     };
 
-    constexpr ZpNumber2Data& p2n() noexcept
-    {
-        thread_local constinit auto p2n = p2n_data;
-        return p2n;
-    }
-
     template<ChunkRange Head, ChunkRange Rest>
     class ZpNumber
     {
@@ -201,7 +184,7 @@ namespace crypto12381::detail
         constexpr explicit ZpNumber(serialized_view<Zp> bytes) requires(Rest.contains(default_range))
         {
             miracl_core::from_bytes(data_, bytes.data());
-            if(miracl_core::compare(data_, p()) >= 0)
+            if(miracl_core::compare(data_, p_data) >= 0)
             {
                 throw std::runtime_error{ "Parse to Zp number over range." };
             }
@@ -218,14 +201,14 @@ namespace crypto12381::detail
         static constexpr ZpNumber<Head, Rest> select(RandomEngine& random_engine) noexcept
         {
             ZpNumber<Head, Rest> result;
-            miracl_core::random_in(result.data_, p(), random_engine);
+            miracl_core::random_in(result.data_, p_data, random_engine);
             return result;
         }
 
         static constexpr ZpNumber<Head, Rest> select_except0(RandomEngine& random_engine) noexcept
         {
             ZpNumber<Head, Rest> result;
-            miracl_core::random_in(result.data_, prev_p(), random_engine);
+            miracl_core::random_in(result.data_, prev_p_data, random_engine);
             miracl_core::increase(result.data_, 1);
             miracl_core::normalize(result.data_);
             return result;
@@ -276,7 +259,7 @@ namespace crypto12381::detail
             miracl_core::big high_part;
             miracl_core::split(high_part, low_part, dbig, p_bits);
 
-            miracl_core::multiply(dbig, high_part, p());
+            miracl_core::multiply(dbig, high_part, p_data);
 
             for(size_t i = 0; i < n_chunks; ++i)
             {
@@ -284,11 +267,11 @@ namespace crypto12381::detail
             }
             miracl_core::normalize(x);
 
-            if(miracl_core::compare(x, p()) == 1)
+            if(miracl_core::compare(x, p_data) == 1)
             {
                 for(size_t i = 0; i < n_chunks; ++i)
                 {
-                    x[i] -= p()[i];
+                    x[i] -= p_data[i];
                 }
                 miracl_core::normalize(x);
             }
@@ -311,7 +294,7 @@ namespace crypto12381::detail
         friend constexpr auto operator-(const ZpNumber& self) noexcept
         {
             auto result = data.create<ZpNumber<>>();
-            miracl_core::mod_negate(data(result), self.data_, p());
+            miracl_core::mod_negate(data(result), self.data_, p_data);
             return result;
 
             // Error in some case
@@ -341,7 +324,7 @@ namespace crypto12381::detail
         friend constexpr auto inverse(const ZpNumber& self) noexcept
         {
             auto result = data.create<ZpNumber<>>(self.data_);
-            miracl_core::mod_inverse(data(result), data(result), p());
+            miracl_core::mod_inverse(data(result), data(result), p_data);
             return result;
         }
 
@@ -438,7 +421,7 @@ namespace crypto12381::detail
             miracl_core::big2 dbig;
             miracl_core::from_bytes(dbig, hash_bytes.data(), hash_state::hash_size);
             Zp_normalized_t result;
-            miracl_core::fixed_time_mod(result.data_, dbig, p(), hash_state::hash_size * 8 - 255);
+            miracl_core::fixed_time_mod(result.data_, dbig, p_data, hash_state::hash_size * 8 - 255);
             return result;
         }
 
@@ -571,7 +554,7 @@ namespace crypto12381::detail
         constexpr ZpNumber<> normalize() const
         {
             auto result = data.create<ZpNumber<>>();
-            miracl_core::mod(data(result), auto{ data_ }, p());
+            miracl_core::mod(data(result), auto{ data_ }, p_data);
             return result;
         }
 
@@ -583,8 +566,8 @@ namespace crypto12381::detail
         constexpr auto operator-() const
         {
             auto result = data.create<ZpNumber<>>();
-            miracl_core::mod(data(result), data(Zp_number()), p());
-            miracl_core::mod_negate(data(result), data(result), p());
+            miracl_core::mod(data(result), data(Zp_number()), p_data);
+            miracl_core::mod_negate(data(result), data(result), p_data);
             return result;
 
             // Error in some case
