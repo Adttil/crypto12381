@@ -3,7 +3,7 @@
 
 namespace crypto12381::mhac_bbs
 {
-    Creds cred_iss(
+    /*Creds cred_iss(
         const PublicParameters& pp, 
         const PrivateKey& sk, 
         size_t t, 
@@ -38,7 +38,7 @@ namespace crypto12381::mhac_bbs
             .e_share = serialize(e_share[i]) (i.in[n]),
             .D = serialize(Di)  (i.in[n])
         };
-    }
+    }*/
 
     Creds cred_iss(
         const PublicParameters& pp, 

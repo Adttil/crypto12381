@@ -60,14 +60,14 @@ namespace crypto12381::mhac_bbs
         RandomEngine& random
     );
     
-    Creds cred_iss(
-        const PublicParameters& pp, 
-        const PrivateKey& sk, 
-        size_t t, 
-        size_t n, 
-        std::span<const serialized_field<Zp>> attributes, 
-        RandomEngine& random
-    );
+    // Creds cred_iss(
+    //     const PublicParameters& pp, 
+    //     const PrivateKey& sk, 
+    //     size_t t, 
+    //     size_t n, 
+    //     std::span<const serialized_field<Zp>> attributes, 
+    //     RandomEngine& random
+    // );
     
     Creds cred_iss(
         const PublicParameters& pp, 
