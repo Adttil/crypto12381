@@ -86,17 +86,33 @@ namespace crypto12381::mhac_bbs
         
     };
 
-    struct Pres{};
+    struct Pres
+    {
+        //(A_, B_, ch, zr, ze)
+        serialized_field<G1^2, Zp^3> fixed_part;
+        std::vector<serialized_field<Zp>> z;
+        std::vector<serialized_field<Zp>> z_hid_pub;
+    };
 
     Pres cred_pres(
         const PublicParameters& pp, 
         const PublicKey& pk, 
         const Creds& creds,
-        std::span<size_t> party_indexes,
-        std::span<const serialized_field<Zp>> attributes,
-        std::span<size_t> Rev,
-        std::span<size_t> Prv,
+        std::span<const size_t> party_indexes,
+        std::span<const size_t> Rev,
+        std::span<const size_t> Prv,
+        std::span<const serialized_field<Zp>> attrs,
+        std::span<const std::vector<serialized_field<Zp>>> attr_shares,
         RandomEngine& random
+    );
+
+    bool verify_pres(
+        const PublicParameters& pp, 
+        const PublicKey& pk,
+        std::span<const size_t> Rev,
+        std::span<const size_t> Prv,
+        std::span<const serialized_field<Zp>> attrs,
+        const Pres& pres
     );
 }
 

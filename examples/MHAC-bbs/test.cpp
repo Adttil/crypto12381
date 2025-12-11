@@ -16,13 +16,21 @@ int main()
 
     const auto attr_info = generate_attributes(pp, 3, 6, Prv, random);
     const auto& [attrs, attr_shares, C] = attr_info;
+
+    const auto creds = cred_iss(pp, sk, 3, C, Pub, attrs, random);
+
+    const std::array<size_t, 3> S{ 0, 2, 5 };
+    const std::array<size_t, 1> Rev{ 1 };
+    const auto pres = cred_pres(pp, pk, creds, S, Rev, Prv, attrs, attr_shares, random);
+
+    const bool success = verify_pres(pp, pk, Rev, Prv, attrs, pres);
     
-    //commitments of share of private attributes for each P
-    //auto commitments = vss_of_private_attributes(pp, 3, 6, Prv, attrs, random);
-
-    auto creds = cred_iss(pp, sk, 3, C, Pub, attrs, random);
-
-
-
-    std::cout << "creds count: " << creds.D.size() << '\n';
+    if(success)
+    {
+        std::cout << "success\n";
+    }
+    else
+    {
+        std::cout << "failed\n";
+    }
 }
