@@ -59,10 +59,6 @@ namespace crypto12381::mhac_bbs
         auto attr = parse<Zp>(attributes);
 
         size_t m = attr.size();
-        if(m > h.size())
-        {
-            throw std::runtime_error{ "attributes is too many" };
-        }
         
         auto C_a = [&](){
             auto x = make_Zp(i) (i.in[1, t + 1]) | materialize;

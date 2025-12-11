@@ -16,7 +16,7 @@ namespace crypto12381::mhac_bbs
     )
     {
         constexpr auto ii = make_symbol<"ii">();
-        //constexpr auto ki = make_symbol<"ki">();
+
         auto [g1, g2] = parse<G1, G2>(pp.g1_g2);
         auto h = parse<G1>(pp.h);
         auto w = parse<G2>(pk);
@@ -25,11 +25,9 @@ namespace crypto12381::mhac_bbs
         auto e_share = parse<Zp>(creds.e_share);
         auto a = parse<Zp>(attrs);
         auto a_share = parse<Zp>(attr_shares);
-
-        //Zp_element auto a0_share0 = a_share[0][0];
-
         auto S = party_indexes | algebraic;
         auto Prv = private_indexes | algebraic;
+        
         size_t j = 0;
 
         const size_t m = attrs.size();
@@ -45,10 +43,9 @@ namespace crypto12381::mhac_bbs
         const size_t t = S.size();
 
         auto x = make_Zp(i + 1) (i.in(S)) | materialize;
-        //auto λi = Π[k.in[t].except(i)] (-x[k] / (x[i] - x[k]));
         auto λk = Π[y.in[t].except(k)] (-x[y] / (x[k] - x[y]));
 
-        // //1. 
+        //1. 
         auto r = random-select_in<Zp>;
 
         //2.
@@ -75,17 +72,11 @@ namespace crypto12381::mhac_bbs
         //6.
         G1_element auto U = Uj * Π[k.in[t].except(j)](Uk);
         Zp_element auto ch = hash(U, A_, B_, a[i](i.in(Rev))).to(Zp);
-
         auto zii_share_j = β_share_j[ii] + ch*(r * a_share[S[j]][ii] * λk(k = j));
         //Prv[ii] in Prv
         auto zii_share_k = β_share_k[ii] + ch*(r * a_share[S[k]][ii] * λk);
-
-        Zp_element auto zi0_share1 = zii_share_k(ii = 0, k = 1); 
-
         auto ze_share_k = (γ_share[k] + ch*(-e_share[S[k]] * λk));
-
         Zp_element auto zr = α + ch * r;
-
         //Hid[ii] in Hid
         auto zii_hid_pub = β_share_j[ii] + ch * (a[Hid[ii]] * r);
 
@@ -93,8 +84,6 @@ namespace crypto12381::mhac_bbs
 
         //8.
         auto zii = zii_share_j + Σ[k.in[1uz, t]](zii_share_k);
-        // Zp_element auto zi0 = zii(ii = 0);
-        // Zp_element auto zi1 = zii(ii = 1);
         Zp_element auto ze = Σ[k.in[t]](ze_share_k);
 
         return {

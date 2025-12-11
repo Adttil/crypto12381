@@ -27,17 +27,11 @@ namespace crypto12381::mhac_bbs
         
         auto C = Π[ii.in[Prv.size()]](h[Prv[ii]]^attr_ii_share[k]) (k.in[n]);
 
-        //return {};
         return { 
             .attributes = serialize(attr[i]) (i.in[m]),
             .private_attributes_share = serialize(attr_ii_share[k]) (ii.in[Prv.size()], k.in[n]),
             .commitments = serialize(C[j]) (j.in[n]) 
         };
-        // return { 
-        //     .attributes = serialize(attr[i]) (i.in[m]),
-        //     .private_attributes_share = serialize(attr_ii_share[j]) (ii.in[Prv.size()], j.in[n]),
-        //     .commitments = serialize(C[j]) (j.in[n]) 
-        // };
     }
 
 } 
