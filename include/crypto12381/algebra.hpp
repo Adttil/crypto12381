@@ -307,7 +307,18 @@ namespace crypto12381
             }
             else if constexpr(Ranged)
             {
-                if constexpr(symbolic<TValue>)
+                if constexpr(not symbolic<TValue> && requires{  
+                    requires not symbolic<decltype(
+                        (T&&)t || std::declval<symbol_substitution<Name, std::ranges::range_reference_t<TValue>>>()
+                    )>; 
+                })
+                {
+                    return (TValue&&)substitution.value 
+                    | transform([expr = std::tuple<T>{ (T&&)t }]<class E, class Self>(this Self&& self, E&& e){
+                        return std::get<0>(std::forward_like<Self>(expr)) || symbol_substitution<Name, E>{ (E&&)e };
+                    });
+                }
+                else 
                 {
                     auto substitute_fn = []<class U, class R>(U&& u, R&& r)
                     {
@@ -319,11 +330,16 @@ namespace crypto12381
                         (TValue&&)substitution.value
                     };
                 }
-                else return (TValue&&)substitution.value 
-                    | transform([expr = std::tuple<T>{ (T&&)t }]<class E, class Self>(this Self&& self, E&& e){
-                        return std::get<0>(std::forward_like<Self>(expr)) || symbol_substitution<Name, E>{ (E&&)e };
-                    });
             }
+            // else if constexpr(std::ranges::range<T> && requires{ requires symbolic<std::ranges::range_value_t<T>>; })
+            // {
+            //     return transform((T&&)t, 
+            //         [substitution = std::move(substitution)]<class E>(E&& e)
+            //         {
+            //             return (E&&)e || substitution;
+            //         }
+            //     );
+            // }
             else
             {
                 return std::forward<T>(t);
@@ -366,6 +382,48 @@ namespace crypto12381
         inline constexpr detail::substitute_ns::substitute_fn substitute{};
     }
 
+    template<fixed_string Name>
+    struct symbol;
+
+    template<class TExpr, fixed_string...ArgsName>
+    constexpr auto make_functor(TExpr&& expr, symbol<ArgsName>...)
+    {
+        return [expr = std::tuple<TExpr>{ (TExpr&&)expr }]<class...Args, class Self>(this Self&& self, Args&&...args)
+        {
+            return substitute(std::get<0>(std::forward_like<Self>(expr)), symbol<ArgsName>{} = (Args&&)args...);
+        };
+    }
+
+    namespace detail 
+    {
+        struct subscript_fn : symbolic_functor_interface<subscript_fn>
+        {
+            using symbolic_functor_interface<subscript_fn>::operator();
+
+            // template<std::ranges::range R, symbolic TIndex>
+            // static constexpr decltype(auto) operator()(R&& r, TIndex&& index)
+            // {
+            //     return symbolic_invocation<subscript_fn, R, TIndex>{ 
+            //         subscript_fn{}, 
+            //         (R&&)r,
+            //         (TIndex&&)(index) 
+            //     };
+            // }
+
+            template<std::ranges::range R>
+            static constexpr decltype(auto) operator()(R&& r, std::ranges::range_difference_t<R> i)
+            {
+                return std::forward<R>(r)[i];
+                //return std::ranges::begin(std::forward<R>(r))[i];
+            }
+        };
+    }
+
+    inline namespace functors 
+    {
+        inline constexpr detail::subscript_fn subscript{};
+    }
+
     template<class T>
     struct symbolic_expression_interface
     {
@@ -373,6 +431,18 @@ namespace crypto12381
         constexpr decltype(auto) operator()(this Self&& self, symbol_substitution<Name, TValue, Ranged>...substitution)
         {
             return substitute(std::forward<Self>(self), std::move(substitution)...);
+        }
+
+        template<fixed_string...ArgsName, class Self>
+        constexpr auto operator()(this Self&& self, symbol<ArgsName>...)
+        {
+            return make_functor((Self&&)self, symbol<ArgsName>{}...);
+        }
+
+        template<symbolic Index, typename Self>
+        constexpr decltype(auto) operator[](this Self&& self, Index&& index)
+        {
+            return subscript(std::forward<Self>(self), std::forward<Index>(index));
         }
     };
 
@@ -513,35 +583,6 @@ namespace crypto12381
         inline constexpr symbol<"x"> x{};
         inline constexpr symbol<"y"> y{};
         inline constexpr symbol<"z"> z{};
-    }
-
-    namespace detail 
-    {
-        struct subscript_fn : symbolic_functor_interface<subscript_fn>
-        {
-            using symbolic_functor_interface<subscript_fn>::operator();
-
-            // template<std::ranges::range R, symbolic TIndex>
-            // static constexpr decltype(auto) operator()(R&& r, TIndex&& index)
-            // {
-            //     return symbolic_invocation<subscript_fn, R, TIndex>{ 
-            //         subscript_fn{}, 
-            //         (R&&)r,
-            //         (TIndex&&)(index) 
-            //     };
-            // }
-
-            template<std::ranges::range R>
-            static constexpr decltype(auto) operator()(R&& r, std::ranges::range_difference_t<R> i)
-            {
-                return std::ranges::begin(std::forward<R>(r))[i];
-            }
-        };
-    }
-
-    inline namespace functors 
-    {
-        inline constexpr detail::subscript_fn subscript{};
     }
 
     namespace detail 

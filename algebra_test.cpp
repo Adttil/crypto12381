@@ -10,6 +10,10 @@ int main()
 
     static constexpr auto f = x + y - 1;
 
+    static constexpr auto ff = f(x, y);
+
+    constexpr auto ff12 = ff(1, 2);
+
     static constexpr auto f2 = f(x = y + 3); //2y + 2
 
     constexpr auto range = f2(y.in[1, 3]);

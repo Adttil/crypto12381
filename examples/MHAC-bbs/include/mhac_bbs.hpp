@@ -20,17 +20,47 @@ namespace crypto12381::mhac_bbs
         Keys keys;
     };
 
-    IssSetupResult iss_setup(size_t m, RandomEngine& random) noexcept;
-
-    // (A, e_share, D)
-    struct Cred
+    struct CredStructure
     {
-        serialized_field<G1> A;
-        serialized_field<Zp> e_share;
-        serialized_field<G1> D;
+        size_t t;
+        std::span<const size_t> Prv;
     };
 
-    std::vector<Cred> cred_iss(
+    // (A, e_share, D)
+    struct Creds
+    {
+        serialized_field<G1> A;
+        std::vector<serialized_field<Zp>> e_share;
+        std::vector<serialized_field<G1>> D;
+    };
+
+    struct AttributesInfo
+    {
+        std::vector<serialized_field<Zp>> attributes;
+        std::vector<std::vector<serialized_field<Zp>>> private_attributes_share;
+        std::vector<serialized_field<G1>> commitments;
+    };
+
+    IssSetupResult iss_setup(size_t m, RandomEngine& random) noexcept;
+
+    AttributesInfo generate_attributes(
+        const PublicParameters& pp, 
+        size_t t, 
+        size_t n, 
+        std::span<const size_t> Prv,
+        RandomEngine& random
+    );
+
+    std::vector<serialized_field<G1>> vss_of_private_attributes(
+        const PublicParameters& pp,
+        size_t t,
+        size_t n,
+        std::span<const size_t> private_indexes,
+        std::span<const serialized_field<Zp>> attributes, 
+        RandomEngine& random
+    );
+    
+    Creds cred_iss(
         const PublicParameters& pp, 
         const PrivateKey& sk, 
         size_t t, 
@@ -38,24 +68,34 @@ namespace crypto12381::mhac_bbs
         std::span<const serialized_field<Zp>> attributes, 
         RandomEngine& random
     );
-
-    std::vector<Cred> cred_iss(
+    
+    Creds cred_iss(
         const PublicParameters& pp, 
         const PrivateKey& sk, 
         size_t t, 
         std::span<const serialized_field<G1>> commitment,
-        std::span<const size_t> private_indexes,
+        std::span<const size_t> public_indexes,
         std::span<const serialized_field<Zp>> attributes, 
         RandomEngine& random
-    );
+    );    
 
-    std::vector<Cred> cred_pres(
+    struct Request
+    {
+        std::array<char, 32> T;
+        std::array<char, 32> nonce;
+        
+    };
+
+    struct Pres{};
+
+    Pres cred_pres(
         const PublicParameters& pp, 
-        const PrivateKey& pk, 
-        std::span<const Cred> creds,
-        std::span<size_t> S,
+        const PublicKey& pk, 
+        const Creds& creds,
+        std::span<size_t> party_indexes,
         std::span<const serialized_field<Zp>> attributes,
-        std::span<size_t> rev,
+        std::span<size_t> Rev,
+        std::span<size_t> Prv,
         RandomEngine& random
     );
 }

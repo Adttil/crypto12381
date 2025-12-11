@@ -7,16 +7,12 @@ namespace crypto12381::bbs
     {
         auto g1 = random-select_in<*G1>;
         auto g2 = random-select_in<*G2>;
-        
-        std::vector<serialized_field<G1>> h(n);
-        for(size_t i = 0; i < n; ++i)
-        {
-            h[i] = serialize(random-select_in<*G1>);
-        }
+
+        auto h = random-select_in<*G1>(n);
 
         return {
             .g1_g2 = serialize(g1, g2),
-            .h  = std::move(h)
+            .h  = serialize(h[i]) (i.in[n])
         };
     }
 
@@ -36,9 +32,8 @@ namespace crypto12381::bbs
 
     std::vector<serialized_field<Zp>> encode_message(std::span<const char> original_message) noexcept
     {
-        return encode_to<Zp>(original_message) 
-            | std::views::transform([](auto&& x)->serialized_field<Zp>{ return serialize(x); })    
-            | std::ranges::to<std::vector>();
+        auto m = encode_to<Zp>(original_message);
+        return serialize(m[i]) (i.in[m.size()]);
     }
 
     Signature sign(const PublicParameters& pp, const PrivateKey& sk, std::span<const serialized_field<Zp>> message, RandomEngine& random)
