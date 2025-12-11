@@ -52,7 +52,7 @@ int main()
     const std::array<size_t, 3> S{ 0, 2, 5 };
     const std::array<size_t, 1> Rev{ 1 };
     std::cout << "cred present...\n";
-    const auto pres = timed<cred_pres>(pp, pk, creds, S, Rev, Prv, attrs, attr_shares, random);
+    const auto pres = timed<cred_pres>(pp, creds, S, Rev, Prv, attrs, attr_shares, random);
 
     std::cout << "verify...\n";
     const bool success = timed<verify_pres>(pp, pk, Rev, Prv, attrs, pres);

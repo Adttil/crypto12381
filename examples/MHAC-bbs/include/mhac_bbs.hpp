@@ -96,7 +96,6 @@ namespace crypto12381::mhac_bbs
 
     Pres cred_pres(
         const PublicParameters& pp, 
-        const PublicKey& pk, 
         const Creds& creds,
         std::span<const size_t> party_indexes,
         std::span<const size_t> Rev,

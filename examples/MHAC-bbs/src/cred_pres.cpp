@@ -4,8 +4,7 @@
 namespace crypto12381::mhac_bbs
 {
     Pres cred_pres(
-        const PublicParameters& pp, 
-        const PublicKey& pk, 
+        const PublicParameters& pp,
         const Creds& creds,
         std::span<const size_t> party_indexes,
         std::span<const size_t> Rev,
@@ -19,7 +18,6 @@ namespace crypto12381::mhac_bbs
 
         auto [g1, g2] = parse<G1, G2>(pp.g1_g2);
         auto h = parse<G1>(pp.h);
-        auto w = parse<G2>(pk);
         auto A = parse<G1>(creds.A);
         auto D_share = parse<G1>(creds.D);
         auto e_share = parse<Zp>(creds.e_share);
