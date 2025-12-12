@@ -7,7 +7,7 @@ namespace crypto12381::mhac_bbs
         const PublicParameters& pp,
         const Creds& creds,
         const PresGroup& group,
-        std::span<const size_t> Rev,
+        const PresType& type,
         std::span<const size_t> private_indexes,
         std::span<const serialized_field<Zp>> public_attributes,
         std::span<const std::vector<serialized_field<Zp>>> attr_shares,
@@ -25,6 +25,9 @@ namespace crypto12381::mhac_bbs
         auto S = group.S | algebraic;
         auto λ = parse<Zp>(group.λ);
         auto D = parse<G1>(group.D);
+        const auto& Rev = type.Rev;
+        auto C_rev = parse<G1>(type.C_rev);
+        auto C_pub = parse<G1>(type.C_pub);
         auto pub_a = parse<Zp>(public_attributes);
         auto a_share = parse<Zp>(attr_shares);
         
@@ -40,8 +43,8 @@ namespace crypto12381::mhac_bbs
         auto HidPub = Hid
             | filter([&](size_t i){ return not std::ranges::contains(Prv, i); });
 
-        auto I_Hid_sub_Prv = sequence(Hid.size())
-            | filter([&](size_t i){ return not std::ranges::contains(Prv, Hid[i]); });
+        // auto I_Hid_sub_Prv = sequence(Hid.size())
+        //     | filter([&](size_t i){ return not std::ranges::contains(Prv, Hid[i]); });
 
         auto I_Pub_in_Rev = sequence(Pub.size())
             | filter([&](size_t i){ return std::ranges::contains(Rev, Pub[i]); });
@@ -51,7 +54,7 @@ namespace crypto12381::mhac_bbs
 
         const size_t t = S.size();
 
-        auto x = make_Zp(i + 1) (i.in(S)) | materialize;
+        //auto x = make_Zp(i + 1) (i.in(S)) | materialize;
         //auto λ = Π[y.in[t].except(k)] (-x[y] / (x[k] - x[y]))  (k.in[t]) | materialize;
 
         //1. 
@@ -60,8 +63,8 @@ namespace crypto12381::mhac_bbs
         //2.
         G1_element auto A_ = A^r;
         //G1_element auto D = Π[k.in[t]](D_share[S[k]]^λ[k]);
-        G1_element auto C_rev = g1 * Π[ii.in(I_Pub_in_Rev)](h[Pub[ii]]^pub_a[ii]);
-        G1_element auto C_pub = C_rev * Π[ii.in(I_Pub_in_Hid)](h[Pub[ii]]^pub_a[ii]);
+        //G1_element auto C_rev = g1 * Π[ii.in(I_Pub_in_Rev)](h[Pub[ii]]^pub_a[ii]);
+        //G1_element auto C_pub = C_rev * Π[ii.in(I_Pub_in_Hid)](h[Pub[ii]]^pub_a[ii]);
         G1_element auto B_ = (C_pub * D)^r;
 
         //3.

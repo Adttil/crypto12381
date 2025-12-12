@@ -54,6 +54,13 @@ namespace crypto12381::mhac_bbs
         std::vector<serialized_field<Zp>> λ;
         serialized_field<G1> D;
     };
+    
+    struct PresType
+    {
+        std::span<const size_t> Rev;
+        serialized_field<G1> C_rev;
+        serialized_field<G1> C_pub;
+    };
 
     struct Pres
     {
@@ -85,11 +92,18 @@ namespace crypto12381::mhac_bbs
 
     PresGroup make_pres_group(const Creds& creds, std::span<const size_t> party_indexes);
 
+    PresType make_pres_type(
+        const PublicParameters& pp, 
+        std::span<const size_t> Rev,
+        std::span<const size_t> Prv,
+        std::span<const serialized_field<Zp>> public_attributes
+    );
+
     Pres cred_pres(
         const PublicParameters& pp, 
         const Creds& creds,
         const PresGroup& group,
-        std::span<const size_t> Rev,
+        const PresType& type,
         std::span<const size_t> Prv,
         std::span<const serialized_field<Zp>> public_attributes,
         std::span<const std::vector<serialized_field<Zp>>> attr_shares,
@@ -99,7 +113,7 @@ namespace crypto12381::mhac_bbs
     bool verify_pres(
         const PublicParameters& pp, 
         const PublicKey& pk,
-        std::span<const size_t> Rev,
+        const PresType& type,
         std::span<const size_t> Prv,
         std::span<const serialized_field<Zp>> public_attributes,
         const Pres& pres

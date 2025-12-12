@@ -6,7 +6,7 @@ namespace crypto12381::mhac_bbs
     bool verify_pres(
         const PublicParameters& pp, 
         const PublicKey& pk,
-        std::span<const size_t> Rev,
+        const PresType& type,
         std::span<const size_t> private_indexes,
         std::span<const serialized_field<Zp>> public_attributes,
         const Pres& pres
@@ -17,6 +17,8 @@ namespace crypto12381::mhac_bbs
         auto [g1, g2] = parse<G1, G2>(pp.g1_g2);
         auto h = parse<G1>(pp.h);
         auto w = parse<G2>(pk);
+        const auto& Rev = type.Rev;
+        auto C_rev = parse<G1>(type.C_rev);
         auto Prv = private_indexes | algebraic;
         auto pub_a = parse<Zp>(public_attributes);
         auto [A_, B_, ch, zr, ze] = parse<G1^2 | Zp^3>(pres.fixed_part);
@@ -33,7 +35,7 @@ namespace crypto12381::mhac_bbs
         auto I_Pub_in_Rev = sequence(Pub.size())
             | filter([&](size_t i){ return std::ranges::contains(Rev, Pub[i]); });
 
-        G1_element auto C_rev = g1 * Π[ii.in(I_Pub_in_Rev)](h[Pub[ii]]^pub_a[ii]);
+        //G1_element auto C_rev = g1 * Π[ii.in(I_Pub_in_Rev)](h[Pub[ii]]^pub_a[ii]);
         G1_element auto C_hid = 
             Π[ii.in[Prv.size()]](h[Prv[ii]]^z[ii]) 
             * 
