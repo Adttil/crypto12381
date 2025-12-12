@@ -44,18 +44,18 @@ int main()
 
     std::cout << "generate attributes...\n";
     const auto attr_info = timed<generate_attributes>(pp, 3, 6, Prv, random);
-    const auto& [attrs, attr_shares, C] = attr_info;
+    const auto& [pub_attrs, prv_attr_shares, C] = attr_info;
 
     std::cout << "cred issue...\n";
-    const auto creds = timed<cred_iss>(pp, sk, 3, C, Pub, attrs, random);
+    const auto creds = timed<cred_iss>(pp, sk, 3, C, Pub, pub_attrs, random);
 
     const std::array<size_t, 3> S{ 0, 2, 5 };
     const std::array<size_t, 1> Rev{ 1 };
     std::cout << "cred present...\n";
-    const auto pres = timed<cred_pres>(pp, creds, S, Rev, Prv, attrs, attr_shares, random);
+    const auto pres = timed<cred_pres>(pp, creds, S, Rev, Prv, pub_attrs, prv_attr_shares, random);
 
     std::cout << "verify...\n";
-    const bool success = timed<verify_pres>(pp, pk, Rev, Prv, attrs, pres);
+    const bool success = timed<verify_pres>(pp, pk, Rev, Prv, pub_attrs, pres);
     
     if(success)
     {

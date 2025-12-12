@@ -9,7 +9,7 @@ namespace crypto12381::mhac_bbs
         std::span<const size_t> party_indexes,
         std::span<const size_t> Rev,
         std::span<const size_t> private_indexes,
-        std::span<const serialized_field<Zp>> attrs,
+        std::span<const serialized_field<Zp>> public_attributes,
         std::span<const std::vector<serialized_field<Zp>>> attr_shares,
         RandomEngine& random
     )
@@ -18,25 +18,33 @@ namespace crypto12381::mhac_bbs
 
         auto [g1, g2] = parse<G1, G2>(pp.g1_g2);
         auto h = parse<G1>(pp.h);
+        const size_t m = h.size();
         auto A = parse<G1>(creds.A);
         auto D_share = parse<G1>(creds.D);
         auto e_share = parse<Zp>(creds.e_share);
-        auto a = parse<Zp>(attrs);
+        auto pub_a = parse<Zp>(public_attributes);
         auto a_share = parse<Zp>(attr_shares);
         auto S = party_indexes | algebraic;
         auto Prv = private_indexes | algebraic;
+        auto Pub = sequence(m) | filter([&](size_t i){ return not std::ranges::contains(Prv, i); });
         
         size_t j = 0;
 
-        const size_t m = attrs.size();
-        auto Hid = sequence(attrs.size())
+        
+        auto Hid = sequence(m)
             | filter([&](size_t i){ return not std::ranges::contains(Rev, i); });
 
-        auto Hid_sub_Prv = Hid
+        auto HidPub = Hid
             | filter([&](size_t i){ return not std::ranges::contains(Prv, i); });
 
         auto I_Hid_sub_Prv = sequence(Hid.size())
             | filter([&](size_t i){ return not std::ranges::contains(Prv, Hid[i]); });
+
+        auto I_Pub_in_Rev = sequence(Pub.size())
+            | filter([&](size_t i){ return std::ranges::contains(Rev, Pub[i]); });
+
+        auto I_Pub_in_Hid = sequence(Pub.size())
+            | filter([&](size_t i){ return std::ranges::contains(Hid, Pub[i]); });
 
         const size_t t = S.size();
 
@@ -49,8 +57,8 @@ namespace crypto12381::mhac_bbs
         //2.
         G1_element auto A_ = A^r;
         G1_element auto D = Π[k.in[t]](D_share[S[k]]^λk);
-        G1_element auto C_rev = g1 * Π[i.in(Rev)](h[i]^a[i]);
-        G1_element auto C_pub = C_rev * Π[i.in(Hid_sub_Prv)](h[i]^a[i]);
+        G1_element auto C_rev = g1 * Π[ii.in(I_Pub_in_Rev)](h[Pub[ii]]^pub_a[ii]);
+        G1_element auto C_pub = C_rev * Π[ii.in(I_Pub_in_Hid)](h[Pub[ii]]^pub_a[ii]);
         G1_element auto B_ = (C_pub * D)^r;
 
         //3.
@@ -69,14 +77,21 @@ namespace crypto12381::mhac_bbs
 
         //6.
         G1_element auto U = Uj * Π[k.in[t].except(j)](Uk);
-        Zp_element auto ch = hash(U, A_, B_, a[i](i.in(Rev))).to(Zp);
+
+        //Fixed me? with a(1, 2, 2) hash(a[0], a[1]) same as hash(a[0], a[2])
+        Zp_element auto ch = hash(U, A_, B_, pub_a[ii](ii.in(I_Pub_in_Rev))).to(Zp);
         auto zii_share_j = β_share_j[ii] + ch*(r * a_share[S[j]][ii] * λk(k = j));
         //Prv[ii] in Prv
         auto zii_share_k = β_share_k[ii] + ch*(r * a_share[S[k]][ii] * λk);
         auto ze_share_k = (γ_share[k] + ch*(-e_share[S[k]] * λk));
         Zp_element auto zr = α + ch * r;
+
+        auto I_Pub_in_HidPub = sequence(Pub.size())
+            | filter([&](size_t i){ return std::ranges::contains(HidPub, Pub[i]); });
+        auto I_Hid_in_HidPub = sequence(Hid.size())
+            | filter([&](size_t i){ return std::ranges::contains(HidPub, Hid[i]); });
         //Hid[ii] in Hid
-        auto zii_hid_pub = β_share_j[ii] + ch * (a[Hid[ii]] * r);
+        auto zii_hid_pub = β_share_j[I_Hid_in_HidPub[ii]] + ch * (pub_a[I_Pub_in_HidPub[ii]] * r);
 
         //7.
 
@@ -87,7 +102,7 @@ namespace crypto12381::mhac_bbs
         return {
             .fixed_part = serialize(A_, B_, ch, zr, ze),
             .z = serialize(zii) (ii.in[Prv.size()]),
-            .z_hid_pub = serialize(zii_hid_pub) (ii.in(I_Hid_sub_Prv))
+            .z_hid_pub = serialize(zii_hid_pub) (ii.in[HidPub.size()])
         };
     }
 } 

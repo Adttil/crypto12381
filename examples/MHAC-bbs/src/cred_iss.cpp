@@ -46,24 +46,26 @@ namespace crypto12381::mhac_bbs
         size_t t, 
         std::span<const serialized_field<G1>> commitment,
         std::span<const size_t> public_indexes,
-        std::span<const serialized_field<Zp>> attributes, 
+        std::span<const serialized_field<Zp>> public_attributes, 
         RandomEngine& random
     )
     {
+        auto ii = make_symbol<"ii">();
+
         auto [g1, g2] = parse<G1, G2>(pp.g1_g2);
         auto h = parse<G1>(pp.h);
         auto γ = parse<Zp>(sk);
         const size_t n = commitment.size();
         auto C = parse<G1>(commitment);
         auto Pub = public_indexes | algebraic;
-        auto attr = parse<Zp>(attributes);
+        auto pub_a = parse<Zp>(public_attributes);
 
-        size_t m = attr.size();
+        size_t m = h.size();
         
-        auto C_a = [&](){
+        G1_element auto C_a = [&](){
             auto x = make_Zp(i) (i.in[1, t + 1]) | materialize;
             auto λi = Π[j.in[t].except(i)] (-x[j] / (x[i] - x[j]));
-            return g1 * Π[t](C[i]^λi) * Π[i.in(Pub)](h[i]^attr[i]);
+            return g1 * Π[t](C[i]^λi) * Π[ii.in[Pub.size()]](h[Pub[ii]]^pub_a[ii]);
         }();
 
         //BBS sign

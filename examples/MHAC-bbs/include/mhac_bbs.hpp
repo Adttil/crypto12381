@@ -34,11 +34,26 @@ namespace crypto12381::mhac_bbs
         std::vector<serialized_field<G1>> D;
     };
 
+    struct AttributesStructure
+    {
+        size_t m;
+        std::span<const size_t> Pub;
+        std::span<const size_t> Prv;
+    };
+
     struct AttributesInfo
     {
-        std::vector<serialized_field<Zp>> attributes;
+        std::vector<serialized_field<Zp>> public_attributes;
         std::vector<std::vector<serialized_field<Zp>>> private_attributes_share;
         std::vector<serialized_field<G1>> commitments;
+    };
+
+    struct Pres
+    {
+        //(A_, B_, ch, zr, ze)
+        serialized_field<G1^2, Zp^3> fixed_part;
+        std::vector<serialized_field<Zp>> z;
+        std::vector<serialized_field<Zp>> z_hid_pub;
     };
 
     IssSetupResult iss_setup(size_t m, RandomEngine& random) noexcept;
@@ -50,24 +65,6 @@ namespace crypto12381::mhac_bbs
         std::span<const size_t> Prv,
         RandomEngine& random
     );
-
-    std::vector<serialized_field<G1>> vss_of_private_attributes(
-        const PublicParameters& pp,
-        size_t t,
-        size_t n,
-        std::span<const size_t> private_indexes,
-        std::span<const serialized_field<Zp>> attributes, 
-        RandomEngine& random
-    );
-    
-    // Creds cred_iss(
-    //     const PublicParameters& pp, 
-    //     const PrivateKey& sk, 
-    //     size_t t, 
-    //     size_t n, 
-    //     std::span<const serialized_field<Zp>> attributes, 
-    //     RandomEngine& random
-    // );
     
     Creds cred_iss(
         const PublicParameters& pp, 
@@ -75,32 +72,18 @@ namespace crypto12381::mhac_bbs
         size_t t, 
         std::span<const serialized_field<G1>> commitment,
         std::span<const size_t> public_indexes,
-        std::span<const serialized_field<Zp>> attributes, 
+        std::span<const serialized_field<Zp>> public_attributes, 
         RandomEngine& random
-    );    
+    );
 
-    struct Request
-    {
-        std::array<char, 32> T;
-        std::array<char, 32> nonce;
-        
-    };
-
-    struct Pres
-    {
-        //(A_, B_, ch, zr, ze)
-        serialized_field<G1^2, Zp^3> fixed_part;
-        std::vector<serialized_field<Zp>> z;
-        std::vector<serialized_field<Zp>> z_hid_pub;
-    };
-
+    
     Pres cred_pres(
         const PublicParameters& pp, 
         const Creds& creds,
         std::span<const size_t> party_indexes,
         std::span<const size_t> Rev,
         std::span<const size_t> Prv,
-        std::span<const serialized_field<Zp>> attrs,
+        std::span<const serialized_field<Zp>> public_attributes,
         std::span<const std::vector<serialized_field<Zp>>> attr_shares,
         RandomEngine& random
     );
@@ -110,7 +93,7 @@ namespace crypto12381::mhac_bbs
         const PublicKey& pk,
         std::span<const size_t> Rev,
         std::span<const size_t> Prv,
-        std::span<const serialized_field<Zp>> attrs,
+        std::span<const serialized_field<Zp>> public_attributes,
         const Pres& pres
     );
 }

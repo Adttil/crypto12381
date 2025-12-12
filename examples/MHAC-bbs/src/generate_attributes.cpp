@@ -17,6 +17,7 @@ namespace crypto12381::mhac_bbs
         auto h = parse<G1>(pp.h);
         size_t m = h.size();
         auto Prv = private_indexes | algebraic;
+        auto Pub = sequence(m) | filter([&](size_t i){ return not std::ranges::contains(Prv, i); });
         auto attr = random-select_in<Zp>(m) | materialize;
 
         auto a = random-select_in<Zp>(Prv.size() * (t - 1)) | materialize;
@@ -28,7 +29,7 @@ namespace crypto12381::mhac_bbs
         auto C = Π[ii.in[Prv.size()]](h[Prv[ii]]^attr_ii_share[k]) (k.in[n]);
 
         return { 
-            .attributes = serialize(attr[i]) (i.in[m]),
+            .public_attributes = serialize(attr[i]) (i.in(Pub)),
             .private_attributes_share = serialize(attr_ii_share[k]) (ii.in[Prv.size()], k.in[n]),
             .commitments = serialize(C[j]) (j.in[n]) 
         };
