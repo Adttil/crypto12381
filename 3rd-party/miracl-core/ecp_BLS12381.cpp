@@ -1109,7 +1109,7 @@ void BLS12381::ECP_clmul(ECP *P, BIG e, BIG maxe)
 
 // Generic multi-multiplication, fixed 4-bit window, P=Sigma e_i*X_i
 // m point doublings
-void BLS12381::ECP_muln(ECP *P,int n,ECP X[],BIG e[])
+void BLS12381::ECP_muln(ECP *P,int n,ECP X[],const BIG e[])
 {
     int i,j,k,nb;
     BIG t,mt;

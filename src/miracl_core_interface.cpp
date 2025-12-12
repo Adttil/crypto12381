@@ -126,6 +126,11 @@ namespace crypto12381::detail::miracl_core
         ECP_add((ECP*)&object, (ECP*)&point);
     }
 
+    void sum_of_products(point1& result, int n, point1* points, const big* numbers) noexcept
+    {
+        ECP_muln((ECP*)&result, n, (ECP*)points, numbers);
+    }
+
     void sub(point1& object, point1& point) noexcept
     {
         ECP_sub((ECP*)&object, (ECP*)&point);

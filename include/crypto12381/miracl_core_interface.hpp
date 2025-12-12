@@ -96,6 +96,9 @@ namespace crypto12381::detail::miracl_core
     // object = object + point
     void add(point1& object, point1& point) noexcept;
 
+    //result = Σ(numbers[i] * points[i]) for i in [n]
+    void sum_of_products(point1& result, int n, point1* points, const big* numbers) noexcept;
+
     // object = object - point
     void sub(point1& object, point1& point) noexcept;
 

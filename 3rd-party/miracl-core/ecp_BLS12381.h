@@ -330,7 +330,7 @@ extern void ECP_clmul2(ECP *P, ECP *Q, B384_58::BIG e, B384_58::BIG f, B384_58::
 	@param X array of n ECPs
 	@param e array of n BIG multipliers
  */
-extern void ECP_muln(ECP *P,int n,ECP X[],B384_58::BIG e[]);
+extern void ECP_muln(ECP *P,int n,ECP X[],const B384_58::BIG e[]);
 
 /**	@brief Multiplies random point by co-factor
  *

@@ -357,8 +357,21 @@ namespace crypto12381::detail
         friend constexpr auto product(std::type_identity<G1Pow>, R&& r) 
         {
             auto result = data.create<G1Point>();
-            miracl_core::get_infinity(data(result));
             
+            // const size_t n = std::ranges::size(r);
+            // std::vector<miracl_core::point1> points(n);
+            // std::vector<ZpNumberData>        numbers(n);
+
+            // for(auto&&[point, number, pow] : std::views::zip(points, numbers, r))
+            // {
+            //     point = data(pow.point().G1_point());
+            //     number = data(pow.number().Zp_number());
+            // }
+
+            // miracl_core::sum_of_products(data(result), n, points.data(), (miracl_core::big*)numbers.data());
+
+            miracl_core::get_infinity(data(result));
+
             const auto sentinel = std::ranges::end(r);
             for(auto iter = std::ranges::begin(r); iter != sentinel; ++iter)
             {
