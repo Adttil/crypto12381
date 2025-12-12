@@ -6,7 +6,7 @@ namespace crypto12381::mhac_bbs
     Pres cred_pres(
         const PublicParameters& pp,
         const Creds& creds,
-        std::span<const size_t> party_indexes,
+        const PresGroup& group,
         std::span<const size_t> Rev,
         std::span<const size_t> private_indexes,
         std::span<const serialized_field<Zp>> public_attributes,
@@ -22,9 +22,12 @@ namespace crypto12381::mhac_bbs
         auto A = parse<G1>(creds.A);
         auto D_share = parse<G1>(creds.D);
         auto e_share = parse<Zp>(creds.e_share);
+        auto S = group.S | algebraic;
+        auto λ = parse<Zp>(group.λ);
+        auto D = parse<G1>(group.D);
         auto pub_a = parse<Zp>(public_attributes);
         auto a_share = parse<Zp>(attr_shares);
-        auto S = party_indexes | algebraic;
+        
         auto Prv = private_indexes | algebraic;
         auto Pub = sequence(m) | filter([&](size_t i){ return not std::ranges::contains(Prv, i); });
         
@@ -49,14 +52,14 @@ namespace crypto12381::mhac_bbs
         const size_t t = S.size();
 
         auto x = make_Zp(i + 1) (i.in(S)) | materialize;
-        auto λk = Π[y.in[t].except(k)] (-x[y] / (x[k] - x[y]));
+        //auto λ = Π[y.in[t].except(k)] (-x[y] / (x[k] - x[y]))  (k.in[t]) | materialize;
 
         //1. 
         auto r = random-select_in<Zp>;
 
         //2.
         G1_element auto A_ = A^r;
-        G1_element auto D = Π[k.in[t]](D_share[S[k]]^λk);
+        //G1_element auto D = Π[k.in[t]](D_share[S[k]]^λ[k]);
         G1_element auto C_rev = g1 * Π[ii.in(I_Pub_in_Rev)](h[Pub[ii]]^pub_a[ii]);
         G1_element auto C_pub = C_rev * Π[ii.in(I_Pub_in_Hid)](h[Pub[ii]]^pub_a[ii]);
         G1_element auto B_ = (C_pub * D)^r;
@@ -80,10 +83,10 @@ namespace crypto12381::mhac_bbs
 
         //Fixed me? with a(1, 2, 2) hash(a[0], a[1]) same as hash(a[0], a[2])
         Zp_element auto ch = hash(U, A_, B_, pub_a[ii](ii.in(I_Pub_in_Rev))).to(Zp);
-        auto zii_share_j = β_share_j[ii] + ch*(r * a_share[S[j]][ii] * λk(k = j));
+        auto zii_share_j = β_share_j[ii] + ch*(r * a_share[S[j]][ii] * λ[j]);
         //Prv[ii] in Prv
-        auto zii_share_k = β_share_k[ii] + ch*(r * a_share[S[k]][ii] * λk);
-        auto ze_share_k = (γ_share[k] + ch*(-e_share[S[k]] * λk));
+        auto zii_share_k = β_share_k[ii] + ch*(r * a_share[S[k]][ii] * λ[k]);
+        auto ze_share_k = (γ_share[k] + ch*(-e_share[S[k]] * λ[k]));
         Zp_element auto zr = α + ch * r;
 
         auto I_Pub_in_HidPub = sequence(Pub.size())

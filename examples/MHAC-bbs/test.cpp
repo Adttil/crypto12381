@@ -50,9 +50,12 @@ int main()
     const auto creds = timed<cred_iss>(pp, sk, 3, C, Pub, pub_attrs, random);
 
     const std::array<size_t, 3> S{ 0, 2, 5 };
+    std::cout << "make_pres_group...\n";
+    const auto group = timed<make_pres_group>(creds, S);
+
     const std::array<size_t, 1> Rev{ 1 };
     std::cout << "cred present...\n";
-    const auto pres = timed<cred_pres>(pp, creds, S, Rev, Prv, pub_attrs, prv_attr_shares, random);
+    const auto pres = timed<cred_pres>(pp, creds, group, Rev, Prv, pub_attrs, prv_attr_shares, random);
 
     std::cout << "verify...\n";
     const bool success = timed<verify_pres>(pp, pk, Rev, Prv, pub_attrs, pres);

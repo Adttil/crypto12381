@@ -48,6 +48,13 @@ namespace crypto12381::mhac_bbs
         std::vector<serialized_field<G1>> commitments;
     };
 
+    struct PresGroup
+    {
+        std::span<const size_t> S;
+        std::vector<serialized_field<Zp>> λ;
+        serialized_field<G1> D;
+    };
+
     struct Pres
     {
         //(A_, B_, ch, zr, ze)
@@ -76,11 +83,12 @@ namespace crypto12381::mhac_bbs
         RandomEngine& random
     );
 
-    
+    PresGroup make_pres_group(const Creds& creds, std::span<const size_t> party_indexes);
+
     Pres cred_pres(
         const PublicParameters& pp, 
         const Creds& creds,
-        std::span<const size_t> party_indexes,
+        const PresGroup& group,
         std::span<const size_t> Rev,
         std::span<const size_t> Prv,
         std::span<const serialized_field<Zp>> public_attributes,
