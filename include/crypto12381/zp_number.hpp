@@ -474,7 +474,7 @@ namespace crypto12381::detail
                             k = 0;
                             continue;
                         }
-                        if(k == n)
+                        if(k == m)
                         {
                             data(result) = data(result.normalize_rests());
                             k = 0;
@@ -800,7 +800,7 @@ namespace crypto12381::detail
                             k = 0;
                             continue;
                         }
-                        if(k == n)
+                        if(k == m)
                         {
                             data(result) = data(result.normalize_rests());
                             k = 0;
