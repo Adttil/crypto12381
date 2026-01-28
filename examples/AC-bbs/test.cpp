@@ -2,9 +2,9 @@
 #include <chrono>
 #include <print>
 
-#include <AC-rbbs.hpp>
+#include <AC-bbs.hpp>
 
-namespace ac = crypto12381::ac_rbbs;
+namespace ac = crypto12381::ac_bbs;
 
 struct timer
 {
@@ -46,11 +46,9 @@ int main()
 
     constexpr size_t I[]{ 0, 3 };
 
-    auto redact_cache = timed<ac::redact>(attributes, sig, I, pk);
-
     const auto& message = "";
 
-    auto pres = timed<ac::pres>(message, sig, redact_cache, random);
+    auto pres = timed<ac::pres>(message, attributes, sig, I, pk, random);
 
     try{
     bool success = timed<ac::verify>(message, attributes, I, pres, pk);
