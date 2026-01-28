@@ -1,5 +1,5 @@
-#ifndef CRYPTO12381_TESTS_PS_PS_HPP
-#define CRYPTO12381_TESTS_PS_PS_HPP
+#ifndef CRYPTO12381_EXAMPLES_PS_PS_HPP
+#define CRYPTO12381_EXAMPLES_PS_PS_HPP
 #include <algorithm>
 #include <vector>
 #include <ranges>

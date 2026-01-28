@@ -1,9 +1,7 @@
-#ifndef CRYPTO12381_TESTS_PS_PS_HPP
-#define CRYPTO12381_TESTS_PS_PS_HPP
-#include <algorithm>
+#ifndef CRYPTO12381_EXAMPLES_AC_RBBS_HPP
+#define CRYPTO12381_EXAMPLES_AC_RBBS_HPP
+
 #include <vector>
-#include <ranges>
-#include <stdexcept>
 #include <crypto12381/interface.hpp>
 
 namespace crypto12381::ac_rbbs 
