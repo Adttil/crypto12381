@@ -228,6 +228,11 @@ namespace crypto12381::detail::miracl_core
 
 namespace crypto12381::detail::miracl_core 
 {
+    void from_bytes(fp12& result, bytes_view& bytes) noexcept
+    {
+        FP12_fromOctet((FP12*)&result, (octet*)&bytes);
+    }
+
     void to_bytes(bytes_view& result, fp12& value) noexcept
     {
         FP12_toOctet((octet*)&result, (FP12*)&value);

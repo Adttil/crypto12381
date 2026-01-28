@@ -179,6 +179,8 @@ namespace crypto12381::detail::miracl_core
         int type;
     };
 
+    void from_bytes(fp12& result, bytes_view& bytes) noexcept;
+
     void to_bytes(bytes_view& result, fp12& value) noexcept;
 
     void inverse(fp12& result, fp12& value) noexcept;

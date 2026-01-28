@@ -60,6 +60,18 @@ namespace crypto12381::detail
         constexpr GTPoint(const GTPoint&) = default;
         constexpr GTPoint(GTPoint&&) = default;
 
+        constexpr explicit GTPoint(serialized_view<GT> bytes)
+        {
+            serialized_field<GT> buffer;
+            std::memcpy(buffer.data(), bytes.data(), serialized_size<GT>);
+            miracl_core::bytes_view buffer_view{
+                .len = serialized_size<GT>,
+                .max = serialized_size<GT>,
+                .data = buffer.data()
+            };
+            miracl_core::from_bytes(data_, buffer_view);
+        }
+
         void serialize(std::span<char, serialized_size<GT>> bytes) const noexcept
         {
             miracl_core::bytes_view buffer_view{
@@ -256,6 +268,14 @@ namespace crypto12381::detail
     constexpr void serialize_to(std::span<char, serialized_size<GT>> bytes, T&& t)
     {
         std::forward<T>(t).GT_point().serialize(bytes);
+    }
+}
+
+namespace crypto12381::detail::sets 
+{
+    constexpr auto parse(constant_t<GT>, serialized_view<GT> bytes)
+    {
+        return detail::GTPoint{ bytes };
     }
 }
 
