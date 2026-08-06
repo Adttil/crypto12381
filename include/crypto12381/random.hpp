@@ -13,7 +13,10 @@ namespace crypto12381
             return impl_;
         }
 
-        explicit RandomEngine(std::span<const char> seed) noexcept;
+        explicit RandomEngine(std::span<const char> seed);
+
+        RandomEngine(const RandomEngine&) = delete;
+        RandomEngine& operator=(const RandomEngine&) = delete;
 
         ~RandomEngine() noexcept;
     private:

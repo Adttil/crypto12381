@@ -11,7 +11,7 @@ namespace crypto12381
 
     };
 
-    RandomEngine::RandomEngine(std::span<const char> seed) noexcept
+    RandomEngine::RandomEngine(std::span<const char> seed)
     {
         core::csprng* rng = impl_ = new RandomEngine::Impl;
         std::string buffer{ seed.begin(), seed.end() };
