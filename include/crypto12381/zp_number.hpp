@@ -58,10 +58,10 @@ namespace crypto12381::detail
     inline constexpr size_t p_bits = 384;
     inline constexpr size_t p_size = p_bits / std::numeric_limits<unsigned char>::digits;
     
-    inline constexpr size_t chunke_bits = sizeof(size_t) * std::numeric_limits<unsigned char>::digits;
+    inline constexpr size_t chunk_bits = sizeof(size_t) * std::numeric_limits<unsigned char>::digits;
     inline constexpr size_t base_bits = 58uz;
     inline constexpr chunk_t base_mask = ((chunk_t)1 << base_bits) - 1;
-    inline constexpr size_t rest_bits = chunke_bits - base_bits;
+    inline constexpr size_t rest_bits = chunk_bits - base_bits;
     inline constexpr chunk_t chunk_max_limit = ((chunk_t)1 << (rest_bits - 1)) - 1;
     inline constexpr chunk_t chunk_min_limit = -chunk_max_limit;
     
@@ -77,9 +77,45 @@ namespace crypto12381::detail
     inline constexpr chunk_t head_min_limit2 = -head_max_limit2;
 
     
-    inline constexpr ChunkRange rest_range_extrem{ head_min_limit, head_max_limit };
+    inline constexpr ChunkRange rest_range_extrem{ chunk_min_limit, chunk_max_limit };
     inline constexpr ChunkRange head_range_extrem{ head_min_limit, head_max_limit };
     inline constexpr ChunkRange head_range_extrem2{ head_min_limit2, head_max_limit2 };
+
+    constexpr bool big_multiplication_safe(ChunkRange l, ChunkRange r) noexcept
+    {
+        if(l.min > l.max || r.min > r.max ||
+           not rest_range_extrem.contains(l) || not rest_range_extrem.contains(r))
+        {
+            return false;
+        }
+
+        const auto l_width = static_cast<size_t>(l.max - l.min);
+        const auto r_width = static_cast<size_t>(r.max - r.min);
+        constexpr size_t chunk_difference_limit = 1uz << (rest_bits - 1);
+        if(l_width > chunk_difference_limit || r_width > chunk_difference_limit)
+        {
+            // BIG_mul evaluates chunk differences before promoting them to dchunk.
+            return false;
+        }
+
+        const auto l_absolute = static_cast<size_t>(std::max(-l.min, l.max));
+        const auto r_absolute = static_cast<size_t>(std::max(-r.min, r.max));
+        constexpr size_t accumulator_limit =
+            (1uz << (rest_bits * 2 - 1)) - 1;
+
+        // In the enabled 7-chunk Karatsuba implementation, an accumulator contains
+        // at most 7 diagonal products and 3 products of chunk differences. Keeping
+        // this coefficient below 2^11 leaves enough room for the shifted carry.
+        return n_chunks * l_absolute * r_absolute +
+               (n_chunks / 2) * l_width * r_width <= accumulator_limit;
+    }
+
+    static_assert(big_multiplication_safe(default_range, default_range));
+    static_assert(big_multiplication_safe(ChunkRange{ -1, 1 }, ChunkRange{ -1, 1 }));
+    static_assert(big_multiplication_safe(ChunkRange{ 0, 31 }, default_range));
+    static_assert(big_multiplication_safe(ChunkRange{ -31, 1 }, default_range));
+    static_assert(not big_multiplication_safe(ChunkRange{ -31, 31 }, default_range));
+    static_assert(not big_multiplication_safe(ChunkRange{ 0, 31 }, ChunkRange{ 0, 31 }));
 
     template<ChunkRange Head = default_range, ChunkRange Rest = default_range>
     class ZpNumber2;
@@ -125,7 +161,6 @@ namespace crypto12381::detail
             miracl_core::big2 r{ 1 };
             miracl_core::shift_left(r, p_bits);
             miracl_core::divide(invp2m, r, p_data);
-            miracl_core::increase(invp2m, 1);
             miracl_core::normalize(invp2m);
 
             return invp2m;
@@ -167,21 +202,29 @@ namespace crypto12381::detail
         friend constexpr bool operator==(const ZpNumber2Data&, const ZpNumber2Data&) = default;
     };
 
-    inline constexpr ZpNumber2Data p2n_data = { 
-        0, 0, 0, 0, 0, 0, 0,
-        0x3FFFFFF00000001L,0x36900BFFF96FFBFL,0x180809A1D80553BL,0x14CA675F520CCE7L,0x73EDA7L,0x0L,0x0L 
+    inline constexpr ZpNumber2Data p2_data = {
+        0x3FFFFFE00000001L, 0x3A401FFFF2DFFBFL, 0x20021CDBB005A77L, 0x17950CFDEE1A62BL,
+        0x34AA9C66148AA41L, 0x264D287709847DBL, 0x2CC20F0E9593F95L, 0x9DE148304F6FBCL,
+        0x347F60F3F4BCL, 0x0L, 0x0L, 0x0L, 0x0L, 0x0L
     };
 
     template<ChunkRange Head, ChunkRange Rest>
     class ZpNumber
     {
         friend DataAccessor;
+        static_assert(Head.min <= Head.max, "invalid head range");
+        static_assert(Head.min >= 0, "negative head is not supported");
+        static_assert(head_range_extrem.contains(Head), "head overflow");
+        static_assert(Rest.min <= Rest.max, "invalid rest range");
+        static_assert(rest_range_extrem.contains(Rest), "rest overflow");
     public:
-        constexpr ZpNumber(unsigned int value) noexcept requires(Rest.contains(default_range))
+        constexpr ZpNumber(unsigned int value) noexcept
+        requires(Head.contains(default_range) && Rest.contains(default_range))
         : data_{ value } 
         {}
 
-        constexpr explicit ZpNumber(serialized_view<Zp> bytes) requires(Rest.contains(default_range))
+        constexpr explicit ZpNumber(serialized_view<Zp> bytes)
+        requires(Head.contains(default_range) && Rest.contains(default_range))
         {
             miracl_core::from_bytes(data_, bytes.data());
             if(miracl_core::compare(data_, p_data) >= 0)
@@ -199,6 +242,7 @@ namespace crypto12381::detail
         }
 
         static constexpr ZpNumber<Head, Rest> select(RandomEngine& random_engine) noexcept
+        requires(Head.contains(default_range) && Rest.contains(default_range))
         {
             ZpNumber<Head, Rest> result;
             miracl_core::random_in(result.data_, p_data, random_engine);
@@ -206,6 +250,7 @@ namespace crypto12381::detail
         }
 
         static constexpr ZpNumber<Head, Rest> select_except0(RandomEngine& random_engine) noexcept
+        requires(Head.contains(default_range) && Rest.contains(default_range))
         {
             ZpNumber<Head, Rest> result;
             miracl_core::random_in(result.data_, prev_p_data, random_engine);
@@ -237,20 +282,75 @@ namespace crypto12381::detail
         constexpr ZpNumber<Head> normalize_rests() const noexcept
         {
             auto result = data.create<ZpNumber<Head>>();
-            data(result)[0] = 0;
+            auto& chunks = data(result);
+            chunks[0] = data_[0];
             for(size_t i = 0; i < n_chunks - 1; ++i)
             {
-                data(result)[i] += data_[i] & base_mask;
-                data(result)[i + 1] = data_[i] >> base_bits;
+                chunks[i + 1] = data_[i + 1] + (chunks[i] >> base_bits);
+                chunks[i] &= base_mask;
             }
             return result;
         }
 
         constexpr ZpNumber<> normalize() const noexcept
         {
+            constexpr size_t n = static_cast<size_t>(Head.min);
+            constexpr size_t m = static_cast<size_t>(Head.max - Head.min);
+
+            if constexpr(m == 0)
+            {
+                return data.create<ZpNumber<>>(ZpNumberData{});
+            }
+            else if constexpr((n == 0 && m <= 3) || (n > 0 && n <= 31 && m <= 2))
+            {
+                auto result = data.create<ZpNumber<>>();
+                if constexpr(Rest.min == default_range.min && Rest.max == default_range.max)
+                {
+                    data(result) = data_;
+                }
+                else
+                {
+                    const auto normalized_rests = normalize_rests();
+                    data(result) = data(normalized_rests);
+                }
+
+                auto& x = data(result);
+                if constexpr(n > 0)
+                {
+                    static constexpr auto np = ZpNumber::get_np<n>();
+                    for(size_t i = 0; i < n_chunks; ++i)
+                    {
+                        x[i] -= data(np)[i];
+                    }
+                    miracl_core::normalize(x);
+                }
+
+                for(size_t i = 0; i < m; ++i)
+                {
+                    if(miracl_core::compare(x, p_data) < 0)
+                    {
+                        break;
+                    }
+                    for(size_t j = 0; j < n_chunks; ++j)
+                    {
+                        x[j] -= p_data[j];
+                    }
+                    miracl_core::normalize(x);
+                }
+                return result;
+            }
+
             auto result = data.create<ZpNumber<>>();
             auto& x = data(result);
-            x = data_;
+            if constexpr(big_multiplication_safe(Rest, default_range))
+            {
+                x = data_;
+            }
+            else
+            {
+                const auto normalized_rests = normalize_rests();
+                x = data(normalized_rests);
+            }
 
             miracl_core::big2 dbig;
             miracl_core::multiply(dbig, x, invp2m());
@@ -267,7 +367,7 @@ namespace crypto12381::detail
             }
             miracl_core::normalize(x);
 
-            if(miracl_core::compare(x, p_data) == 1)
+            if(miracl_core::compare(x, p_data) >= 0)
             {
                 for(size_t i = 0; i < n_chunks; ++i)
                 {
@@ -293,32 +393,28 @@ namespace crypto12381::detail
 
         friend constexpr auto operator-(const ZpNumber& self) noexcept
         {
-            auto result = data.create<ZpNumber<>>();
-            miracl_core::mod_negate(data(result), self.data_, p_data);
-            return result;
+            constexpr chunk_t n = Head.max > 0 ? Head.max : 0;
+            constexpr auto head = ChunkRange{ n, n } - Head;
+            constexpr auto rest = default_range - Rest;
+            if constexpr(n > chunk_max_limit || not head_range_extrem.contains(head))
+            {
+                return -self.normalize();
+            }
+            else if constexpr(not rest_range_extrem.contains(rest))
+            {
+                return -self.normalize_rests();
+            }
+            else
+            {
+                static constexpr auto np = ZpNumber::get_np<static_cast<size_t>(n)>();
 
-            // Error in some case
-            // constexpr auto head = ChunkRange{ Head.max - 1, Head.max } - Head;
-            // constexpr auto rest = default_range - Rest;
-            // if constexpr(not head_range_extrem.contains(head))
-            // {
-            //     return -self.normalize();
-            // }
-            // else if constexpr(not rest_range_extrem.contains(rest))
-            // {
-            //     return -self.normalize_rests();
-            // }
-            // else
-            // {
-            //     static constinit auto np = ZpNumber::get_np<Head.max>();
-
-            //     auto result = data.create<ZpNumber<head, rest>>();
-            //     for(size_t i = 0; i < n_chunks; ++i)
-            //     {
-            //         data(result)[i] = data(np)[i] - self.data_[i];
-            //     }
-            //     return result;
-            // }
+                auto result = data.create<ZpNumber<head, rest>>();
+                for(size_t i = 0; i < n_chunks; ++i)
+                {
+                    data(result)[i] = data(np)[i] - self.data_[i];
+                }
+                return result;
+            }
         }
 
         friend constexpr auto inverse(const ZpNumber& self) noexcept
@@ -371,24 +467,31 @@ namespace crypto12381::detail
                 static_assert((chunk_t)Value >= chunk_min_limit && (chunk_t)Value <= chunk_max_limit);
             }
 
-            constexpr auto head = Head * constant_t<Value>{};
-            constexpr auto rest = Rest * constant_t<Value>{};
-            if constexpr(not head_range_extrem.contains(head))
+            if constexpr(std::signed_integral<decltype(Value)> && Value < 0)
             {
-                return self.normalize() * constant_t<Value>{};
-            }
-            else if constexpr(not rest_range_extrem.contains(rest))
-            {
-                return self.normalize_rests() * constant_t<Value>{};
+                return -(self * constant_t<-Value>{});
             }
             else
             {
-                auto result = data.create<ZpNumber<head, rest>>();
-                for(size_t i = 0; i < n_chunks; ++i)
+                constexpr auto head = Head * constant_t<Value>{};
+                constexpr auto rest = Rest * constant_t<Value>{};
+                if constexpr(not head_range_extrem.contains(head))
                 {
-                    data(result)[i] = self.data_[i] * Value;
+                    return self.normalize() * constant_t<Value>{};
                 }
-                return result;
+                else if constexpr(not rest_range_extrem.contains(rest))
+                {
+                    return self.normalize_rests() * constant_t<Value>{};
+                }
+                else
+                {
+                    auto result = data.create<ZpNumber<head, rest>>();
+                    for(size_t i = 0; i < n_chunks; ++i)
+                    {
+                        data(result)[i] = self.data_[i] * Value;
+                    }
+                    return result;
+                }
             }
         }
 
@@ -396,10 +499,28 @@ namespace crypto12381::detail
         friend constexpr auto operator*(const ZpNumber& l, const ZpNumber<RHead, RRest>& r) noexcept
         {
             constexpr auto head = Head * RHead;
-            static_assert(head_range_extrem2.contains(head), "head overflow");
-            auto result = data.create<ZpNumber2<head>>();
-            miracl_core::multiply(data(result), l.data_ , data(r));
-            return result;
+            if constexpr(not head_range_extrem2.contains(head))
+            {
+                return l.normalize() * r.normalize();
+            }
+            else if constexpr(big_multiplication_safe(Rest, RRest))
+            {
+                auto result = data.create<ZpNumber2<head>>();
+                miracl_core::multiply(data(result), l.data_ , data(r));
+                return result;
+            }
+            else if constexpr(big_multiplication_safe(default_range, RRest))
+            {
+                return l.normalize_rests() * r;
+            }
+            else if constexpr(big_multiplication_safe(Rest, default_range))
+            {
+                return l * r.normalize_rests();
+            }
+            else
+            {
+                return l.normalize_rests() * r.normalize_rests();
+            }
         }
 
          template<ChunkRange RHead, ChunkRange RRest>
@@ -429,13 +550,13 @@ namespace crypto12381::detail
         requires specified<std::ranges::range_value_t<R>, ZpNumber>
         friend constexpr auto sum(std::type_identity<ZpNumber>, R&& r) 
         {
-            if constexpr(Rest.min == 0 && Rest.max == 0)
+            if constexpr(Head.min == Head.max || (Rest.min == 0 && Rest.max == 0))
             {
-                return ZpNumber{};
+                return data.create<ZpNumber<>>(ZpNumberData{});
             }
-            else if(std::ranges::size(r) == 0)
+            else if(std::ranges::empty(r))
             {
-                return data.create<ZpNumber<>>();
+                return data.create<ZpNumber<>>(ZpNumberData{});
             }
             else
             {
@@ -457,39 +578,38 @@ namespace crypto12381::detail
                 }
                 else
                 {
-                    auto result = data.create<ZpNumber<>>();
+                    using accumulator_t = ZpNumber<
+                        ChunkRange{ 0, head_max_limit }, rest_range_extrem>;
+                    ZpNumberData result;
                     auto i = std::ranges::begin(r);
-                    data(result) = data(*i);
+                    result = data(*i);
                     size_t j = 0;
                     size_t k = 0;
                     for(++i; i != std::ranges::end(r); ++i)
                     {
-                        data(result) = data(result + *i);
+                        for(size_t index = 0; index < n_chunks; ++index)
+                        {
+                            result[index] += data(*i)[index];
+                        }
                         ++j;
                         ++k;
                         if(j == n)
                         {
-                            data(result) = data(result.normalize());
+                            const auto accumulated = data.create<accumulator_t>(result);
+                            result = data(accumulated.normalize());
                             j = 0;
                             k = 0;
                             continue;
                         }
                         if(k == m)
                         {
-                            data(result) = data(result.normalize_rests());
+                            const auto accumulated = data.create<accumulator_t>(result);
+                            result = data(accumulated.normalize_rests());
                             k = 0;
                             continue;
                         }
                     }
-                    if(j != 0)
-                    {
-                        data(result) = data(result.normalize());
-                    }
-                    else if(k != 0)
-                    {
-                        data(result) = data(result.normalize_rests());
-                    }
-                    return result;
+                    return data.create<accumulator_t>(result).normalize();
                 }
             }
         }
@@ -527,6 +647,11 @@ namespace crypto12381::detail
     class ZpNumber2
     {
         friend DataAccessor;
+        static_assert(Head.min <= Head.max, "invalid head range");
+        static_assert(Head.min >= 0, "negative head is not supported");
+        static_assert(head_range_extrem2.contains(Head), "head overflow");
+        static_assert(Rest.min <= Rest.max, "invalid rest range");
+        static_assert(rest_range_extrem.contains(Rest), "rest overflow");
     public:
         constexpr ZpNumber<> Zp_number() const noexcept
         {
@@ -542,11 +667,12 @@ namespace crypto12381::detail
         constexpr ZpNumber2<Head> normalize_rests() const noexcept
         {
             auto result = data.create<ZpNumber2<Head>>();
-            data(result)[0] = 0;
+            auto& chunks = data(result);
+            chunks[0] = data_[0];
             for(size_t i = 0; i < n_chunks2 - 1; ++i)
             {
-                data(result)[i] += data_[i] & base_mask;
-                data(result)[i + 1] = data_[i] >> base_bits;
+                chunks[i + 1] = data_[i + 1] + (chunks[i] >> base_bits);
+                chunks[i] &= base_mask;
             }
             return result;
         }
@@ -565,33 +691,28 @@ namespace crypto12381::detail
 
         constexpr auto operator-() const
         {
-            auto result = data.create<ZpNumber<>>();
-            miracl_core::mod(data(result), auto{ data_ }, p_data);
-            miracl_core::mod_negate(data(result), data(result), p_data);
-            return result;
+            constexpr chunk_t n = Head.max > 0 ? Head.max : 0;
+            constexpr auto head = ChunkRange{ n, n } - Head;
+            constexpr auto rest = default_range - Rest;
+            if constexpr(n > chunk_max_limit || not head_range_extrem2.contains(head))
+            {
+                return -normalize();
+            }
+            else if constexpr(not rest_range_extrem.contains(rest))
+            {
+                return -normalize_rests();
+            }
+            else
+            {
+                static constexpr auto np2 = get_np2<static_cast<size_t>(n)>();
 
-            // Error in some case
-            // constexpr auto head = ChunkRange{ Head.max - 1, Head.max } - Head;
-            // constexpr auto rest = default_range - Rest;
-            // if constexpr(not head_range_extrem2.contains(head))
-            // {
-            //     return -normalize();
-            // }
-            // else if constexpr(not rest_range_extrem.contains(rest))
-            // {
-            //     return -normalize_rests();
-            // }
-            // else
-            // {
-            //     constexpr auto np2n = get_np2n<Head.max>();
-
-            //     auto result = data.create<ZpNumber2<head, rest>>();
-            //     for(size_t i = 0; i < n_chunks2; ++i)
-            //     {
-            //         data(result)[i] = data(np2n)[i] - data_[i];
-            //     }
-            //     return result;
-            // }
+                auto result = data.create<ZpNumber2<head, rest>>();
+                for(size_t i = 0; i < n_chunks2; ++i)
+                {
+                    data(result)[i] = data(np2)[i] - data_[i];
+                }
+                return result;
+            }
         }
 
         friend constexpr ZpNumber<> inverse(const ZpNumber2& self) noexcept
@@ -626,7 +747,11 @@ namespace crypto12381::detail
         template<ChunkRange RHead, ChunkRange RRest>
         friend constexpr auto operator+(const ZpNumber2& l, const ZpNumber<RHead, RRest>& r) noexcept
         {
-            constexpr auto head = Head + ChunkRange{ sign(RHead.min), sign(RHead.max) };
+            constexpr ChunkRange r_head_in_p2{
+                0,
+                RHead.max > 0 ? 1 : 0
+            };
+            constexpr auto head = Head + r_head_in_p2;
             constexpr auto rest = Rest + RRest;
             if constexpr(not head_range_extrem2.contains(head))
             {
@@ -688,24 +813,31 @@ namespace crypto12381::detail
                 static_assert((chunk_t)Value >= chunk_min_limit && (chunk_t)Value <= chunk_max_limit);
             }
 
-            constexpr auto head = Head * constant_t<Value>{};
-            constexpr auto rest = Rest * constant_t<Value>{};
-            if constexpr(not head_range_extrem.contains(head))
+            if constexpr(std::signed_integral<decltype(Value)> && Value < 0)
             {
-                return self.normalize() * constant_t<Value>{};
-            }
-            else if constexpr(not rest_range_extrem.contains(rest))
-            {
-                return self.normalize_rests() * constant_t<Value>{};
+                return -(self * constant_t<-Value>{});
             }
             else
             {
-                auto result = data.create<ZpNumber2<head, rest>>();
-                for(size_t i = 0; i < n_chunks2; ++i)
+                constexpr auto head = Head * constant_t<Value>{};
+                constexpr auto rest = Rest * constant_t<Value>{};
+                if constexpr(not head_range_extrem2.contains(head))
                 {
-                    data(result)[i] = self.data_[i] * Value;
+                    return self.normalize() * constant_t<Value>{};
                 }
-                return result;
+                else if constexpr(not rest_range_extrem.contains(rest))
+                {
+                    return self.normalize_rests() * constant_t<Value>{};
+                }
+                else
+                {
+                    auto result = data.create<ZpNumber2<head, rest>>();
+                    for(size_t i = 0; i < n_chunks2; ++i)
+                    {
+                        data(result)[i] = self.data_[i] * Value;
+                    }
+                    return result;
+                }
             }
         }
 
@@ -755,17 +887,17 @@ namespace crypto12381::detail
         requires specified<std::ranges::range_value_t<R>, ZpNumber2>
         friend constexpr auto sum(std::type_identity<ZpNumber2>, R&& r) 
         {
-            if constexpr(Rest.min == 0 && Rest.max == 0)
+            if constexpr(Head.min == Head.max || (Rest.min == 0 && Rest.max == 0))
             {
-                return ZpNumber2{};
+                return data.create<ZpNumber<>>(ZpNumberData{});
             }
-            else if(std::ranges::size(r) == 0)
+            else if(std::ranges::empty(r))
             {
-                return data.create<ZpNumber2<>>();
+                return data.create<ZpNumber<>>(ZpNumberData{});
             }
             else
             {
-                constexpr size_t n = head_range_extrem / Head - 1;
+                constexpr size_t n = head_range_extrem2 / Head - 1;
                 constexpr size_t m = rest_range_extrem / Rest - 1;
                 if constexpr(n == 0)
                 {
@@ -783,39 +915,38 @@ namespace crypto12381::detail
                 }
                 else
                 {
-                    auto result = data.create<ZpNumber2<>>();
+                    using accumulator_t = ZpNumber2<
+                        ChunkRange{ 0, head_max_limit2 }, rest_range_extrem>;
+                    ZpNumber2Data result;
                     auto i = std::ranges::begin(r);
-                    data(result) = data(*i);
+                    result = data(*i);
                     size_t j = 0;
                     size_t k = 0;
                     for(++i; i != std::ranges::end(r); ++i)
                     {
-                        data(result) = data(result + *i);
+                        for(size_t index = 0; index < n_chunks2; ++index)
+                        {
+                            result[index] += data(*i)[index];
+                        }
                         ++j;
                         ++k;
                         if(j == n)
                         {
-                            data(result) = data(result.normalize());
+                            const auto accumulated = data.create<accumulator_t>(result);
+                            result = data(accumulated.normalize());
                             j = 0;
                             k = 0;
                             continue;
                         }
                         if(k == m)
                         {
-                            data(result) = data(result.normalize_rests());
+                            const auto accumulated = data.create<accumulator_t>(result);
+                            result = data(accumulated.normalize_rests());
                             k = 0;
                             continue;
                         }
                     }
-                    if(j != 0)
-                    {
-                        data(result) = data(result.normalize());
-                    }
-                    else if(k != 0)
-                    {
-                        data(result) = data(result.normalize_rests());
-                    }
-                    return result;
+                    return data.create<accumulator_t>(result).normalize();
                 }
             }
         }
@@ -838,9 +969,9 @@ namespace crypto12381::detail
         constexpr ZpNumber2() noexcept = default;
 
         template<size_t N>
-        static consteval auto get_np2n()
+        static consteval auto get_np2()
         {
-            return (data.create<ZpNumber2<>>(p2n_data) * constant_t<N>{}).normalize_rests();
+            return (data.create<ZpNumber2<>>(p2_data) * constant_t<N>{}).normalize_rests();
         }
 
         ZpNumber2Data data_;
@@ -849,7 +980,14 @@ namespace crypto12381::detail
     template<Zp_element T>
     constexpr void serialize_to(std::span<char, serialized_size<Zp>> bytes, T&& t)
     {
-        std::forward<T>(t).Zp_number().serialize(bytes);
+        if constexpr(requires{ std::forward<T>(t).normalize(); })
+        {
+            std::forward<T>(t).normalize().serialize(bytes);
+        }
+        else
+        {
+            std::forward<T>(t).Zp_number().normalize().serialize(bytes);
+        }
     }
 }
 
@@ -917,13 +1055,15 @@ namespace crypto12381
             {
                 if constexpr(std::signed_integral<T>)
                 {
+                    using unsigned_t = std::make_unsigned_t<T>;
                     if(x >= 0)
                     {
-                        return make_Zp((std::make_unsigned_t<T>)x);
+                        return make_Zp_fn::operator()(static_cast<unsigned_t>(x));
                     }
                     else
                     {
-                        return (detail::ZpNumber<>)-make_Zp((std::make_unsigned_t<T>)-x);
+                        const auto absolute = unsigned_t{} - static_cast<unsigned_t>(x);
+                        return (detail::ZpNumber<>)-make_Zp_fn::operator()(absolute);
                     }
                 }
                 else
