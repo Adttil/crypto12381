@@ -32,6 +32,10 @@ namespace crypto12381::ac_rbbs
             {
                 keys.pk.Y[i] = serialize(g^yn);
             }
+            else
+            {
+                keys.pk.Y[i] = serialize(g);
+            }
             self(yn * y, i + 1);
         }(y);
         
