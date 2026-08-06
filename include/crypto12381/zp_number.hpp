@@ -60,7 +60,7 @@ namespace crypto12381::detail
     
     inline constexpr size_t chunke_bits = sizeof(size_t) * std::numeric_limits<unsigned char>::digits;
     inline constexpr size_t base_bits = 58uz;
-    inline constexpr chunk_t base_mask = ((chunk_t)1 << (base_bits + 1)) - 1;
+    inline constexpr chunk_t base_mask = ((chunk_t)1 << base_bits) - 1;
     inline constexpr size_t rest_bits = chunke_bits - base_bits;
     inline constexpr chunk_t chunk_max_limit = ((chunk_t)1 << (rest_bits - 1)) - 1;
     inline constexpr chunk_t chunk_min_limit = -chunk_max_limit;
