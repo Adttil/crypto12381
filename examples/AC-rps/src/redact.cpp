@@ -6,13 +6,12 @@ namespace crypto12381::ac_rps
     RedactCache redact(std::span<serialized_field<Zp>> attr, const Signature& sig, std::span<const size_t> I, const PublicKey& pk)
     {
         auto tilde_Y = parse<G2>(pk.tilde_Y);
-        auto a = parse<Zp>(attr) | materialize;
+        auto a = parse<Zp>(attr);
         const size_t n = a.size();
-        auto J = sequence(n)
-            | filter([&](size_t i){ return not std::ranges::contains(I, i); });
-        
-        auto tilde_C_J = Π[j.in(J).except(0)](tilde_Y[j]^a[j]);
+        auto [h, sigma, tilde_M] = parse<G1^2|G2>(sig);
 
-        return serialize(tilde_C_J);
+        auto tilde_H = tilde_M / Π[i.in(I)](tilde_Y[i]^a[i]);
+
+        return serialize(tilde_H);
     }
 }

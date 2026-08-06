@@ -5,43 +5,44 @@
 
 namespace crypto12381::ac_rps
 {
-    PresInfo pres(std::span<const char> m, std::span<serialized_field<Zp>> attr, const Signature& sig, 
-        std::span<const size_t> I, const RedactCache& redact_cache, const PublicKey& pk, RandomEngine& random)
+    PresInfo pres(std::span<const char> m, std::span<serialized_field<Zp>> attr, const Signature& sig,
+        std::span<const size_t> indexes, const RedactCache& redact_cache, const UserSecretKey& usk, const PublicKey& pk, RandomEngine& random)
     {
-        auto a = parse<Zp>(attr);
+        auto a = parse<Zp>(attr) | materialize;
         const size_t n = a.size();
-        auto [A, B] = parse<G1^2>(sig);
+        auto [h, sigma, tilde_M] = parse<G1^2|G2>(sig);
+        auto I = indexes | algebraic;
         auto J = sequence(n) | filter([&](size_t i){ return not std::ranges::contains(I, i); });
-        auto tilde_C_J = parse<G2>(redact_cache);
+        auto tilde_H = parse<G2>(redact_cache);
         auto [g, tilde_g, tilde_X] = parse<G1|G2^2>(pk.fixed_part);
-        auto Y = parse<G1>(pk.Y);
-        auto tilde_Y = parse<G2>(pk.tilde_Y);
-        
-        auto [k, r, t] = random-select_in<Zp^3>;
+        auto Y = parse<G1>(pk.Y) | materialize;
+        auto z = parse<Zp>(usk);
 
-        auto A_ = A^r;
-        auto B_ = (B^r) * (A_^t);
-        auto tilde_C_J_ = (tilde_g^t) * tilde_C_J;
+        std::vector<size_t> I_plus(indexes.begin(), indexes.end());
+        I_plus.push_back(n);
+        auto Ip = I_plus | algebraic;
 
-        auto q = hash(A_, B_, tilde_C_J_, i).to(Zp) (i.in[n]) | materialize;
+        auto [r, t, rho] = random-select_in<Zp^3>;
 
-        auto Yks = sequence(2*n)
+        auto sigma1_ = h^r;
+        auto sigma2_ = (sigma^r) * (sigma1_^t);
+        auto tilde_sigma_ = (tilde_g^t) * tilde_H;
+
+        auto q = hash(sigma1_, sigma2_, tilde_sigma_, indexes, a[j](j.in(I)), i)
+            .to(Zp) (i.in(Ip)) | materialize;
+
+        auto sigma3_fixed = Π[i.in[I_plus.size()]](Y[n - Ip[i]]^(t * q[i]));
+        auto sigma3_cross_terms = sequence(2uz * n + 1uz)
             | std::views::transform([&](size_t k){
-                auto valid_i = I
-                | filter([&](size_t i){ return std::ranges::contains(J, k - n + i); });
-                bool has_t = std::ranges::contains(I, n - 1 - k);
-                if(valid_i.empty() && not has_t)
+                auto valid_ii = sequence(I_plus.size())
+                    | filter([&](size_t ii){
+                        return std::ranges::contains(J, k + I_plus[ii] - n - 1uz);
+                    });
+                if(not valid_ii.empty())
                 {
-                    return decltype(std::make_optional(Y[k]^Σ[i.in(valid_i)](q[i] * a[k - n + i]).normalize())){ std::nullopt };
+                    return std::make_optional(Y[k]^Σ[i.in(valid_ii)](q[i] * a[k + Ip[i] - n - 1uz]));
                 }
-                if(has_t)
-                {
-                    return std::make_optional(Y[k]^(t + Σ[i.in(valid_i)](q[i] * a[k - n + i])).normalize()); 
-                }
-                else
-                {
-                    return std::make_optional(Y[k]^Σ[i.in(valid_i)](q[i] * a[k - n + i]).normalize()); 
-                }
+                return decltype(std::make_optional(Y[k]^Σ[i.in(valid_ii)](q[i] * a[k + Ip[i] - n - 1uz]))){ std::nullopt };
             })
             | std::views::filter([](auto&& Yk){
                 return Yk.has_value();
@@ -50,16 +51,13 @@ namespace crypto12381::ac_rps
                 return Yk.value();
             })
         ;
+        auto sigma3_ = sigma3_fixed * Π(sigma3_cross_terms);
 
-        auto D_ = Π(Yks);
+        auto C = sigma1_^z;
+        auto C0 = sigma1_^rho;
+        auto c0 = hash(sigma1_, C, C0).to(Zp);
+        auto s0 = rho + -c0*z;
 
-        auto U = pair(A, tilde_Y[0]^k);
-
-        auto c = hash(m, A_, B_, tilde_C_J_, D_, U).to(Zp);
-
-        auto s = k + a[0]*c;
-        // auto t = β + -w*c;
-
-        return serialize(A_, B_, D_, tilde_C_J_, U, s);
+        return serialize(sigma1_, sigma2_, sigma3_, C, tilde_sigma_, c0, s0);
     }
 }

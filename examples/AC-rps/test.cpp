@@ -20,7 +20,7 @@ struct timer
         auto end_time = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
         std::println("finish in {} μs", duration);
-    }  
+    }
 };
 
 // mesure execution time for any function
@@ -34,7 +34,7 @@ constexpr decltype(auto) timed(Args&&...args)
 int main()
 {
     constexpr size_t n = 64;
-    
+
     auto random = ac::create_random_engine("seed");
 
     auto keys = timed<ac::keygen>(n, random);
@@ -42,7 +42,10 @@ int main()
 
     auto attributes = ac::generate_attributes(pk, n, random);
 
-    auto sig = timed<ac::issue>(keys, attributes, random);
+    auto user_keys = timed<ac::user_keygen>(pk, random);
+    auto&& [usk, upk] = user_keys;
+
+    auto sig = timed<ac::issue>(keys, upk, attributes, random);
 
     constexpr size_t I[]{ 0, 1, 3 };
 
@@ -50,7 +53,7 @@ int main()
 
     const auto& message = "";
 
-    auto pres = timed<ac::pres>(message, attributes, sig, I, redact_cache, pk, random);
+    auto pres = timed<ac::pres>(message, attributes, sig, I, redact_cache, usk, pk, random);
 
     try{
     bool success = timed<ac::verify>(message, attributes, I, pres, pk);
