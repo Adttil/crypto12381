@@ -2,6 +2,7 @@
 #define CRYPTO12381_G1_POINT_HPP
 
 #include <cstring>
+#include <stdexcept>
 #include <tuple>
 
 #include "miracl_core_interface.hpp"
@@ -92,7 +93,10 @@ namespace crypto12381::detail
                 .max = serialized_size<G1>,
                 .data = buffer.data()
             };
-            miracl_core::from_bytes(data_, buffer_view);
+            if(miracl_core::from_bytes(data_, buffer_view) != 1)
+            {
+                throw std::runtime_error{ "Failed to deserialize G1 point." };
+            }
         }
 
         constexpr G1Point(const G1Point&) = default;
