@@ -26,7 +26,7 @@
 using namespace B384_58;
 using namespace BLS12381;
 
-int BLS12381::ECP2_isinf(ECP2 *P)
+int BLS12381::ECP2_isinf(const ECP2 *P)
 {
     return (FP2_iszilch(&(P->x)) & FP2_iszilch(&(P->z)));
 }

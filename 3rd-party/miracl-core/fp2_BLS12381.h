@@ -43,7 +43,7 @@ typedef struct
 	@param x FP2 number to be tested
 	@return 1 if zero, else returns 0
  */
-extern int FP2_iszilch(FP2 *x);
+extern int FP2_iszilch(const FP2 *x);
 
 /**	@brief Tests for lexically larger 
  *

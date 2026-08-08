@@ -129,7 +129,7 @@ typedef struct
 	@param P ECP point to be tested
 	@return 1 if infinity, else returns 0
  */
-extern int ECP_isinf(ECP *P);
+extern int ECP_isinf(const ECP *P);
 /**	@brief Tests for equality of two ECPs
  *
 	@param P ECP instance to be compared

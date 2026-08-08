@@ -264,7 +264,7 @@ void BLS12381::FP_from_int(FP *x,int a)
 
 /* test x==0 ? */
 /* SU= 48 */
-int BLS12381::FP_iszilch(FP *x)
+int BLS12381::FP_iszilch(const FP *x)
 {
     BIG m;
     FP y;
@@ -326,7 +326,7 @@ void BLS12381::FP_zero(FP *x)
     x->XES = 1;
 }
 
-int BLS12381::FP_equals(FP *x, FP *y)
+int BLS12381::FP_equals(const FP *x, const FP *y)
 {
     FP xg, yg;
     FP_copy(&xg, x);

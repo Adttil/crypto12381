@@ -33,7 +33,7 @@ using namespace B384_58;
 
 /* test x==0 ? */
 /* SU= 8 */
-int BLS12381::FP2_iszilch(FP2 *x)
+int BLS12381::FP2_iszilch(const FP2 *x)
 {
     return (FP_iszilch(&(x->a)) & FP_iszilch(&(x->b)));
 }

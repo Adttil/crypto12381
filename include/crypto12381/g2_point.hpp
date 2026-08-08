@@ -70,6 +70,12 @@ namespace crypto12381::detail
     public:
         constexpr explicit G2Point(serialized_view<G2> bytes)
         {
+            if(bytes.front() == 0)
+            {
+                miracl_core::get_infinity(data_);
+                return;
+            }
+
             serialized_field<G2> buffer;
             std::memcpy(buffer.data(), bytes.data(), serialized_size<G2>);
             miracl_core::bytes_view buffer_view{
@@ -88,6 +94,12 @@ namespace crypto12381::detail
 
         void serialize(std::span<char, serialized_size<G2>> bytes) const noexcept
         {
+            if(miracl_core::is_infinity(data_))
+            {
+                std::memset(bytes.data(), 0, serialized_size<G2>);
+                return;
+            }
+
             miracl_core::bytes_view buffer_view{
                 .len = 0,
                 .max = serialized_size<G2>,

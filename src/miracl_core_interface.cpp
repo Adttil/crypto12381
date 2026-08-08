@@ -116,6 +116,11 @@ namespace crypto12381::detail::miracl_core
         ECP_toOctet((octet*)&result, (ECP*)&point, compressed);
     }
 
+    bool is_infinity(const point1& point) noexcept
+    {
+        return ECP_isinf((const ECP*)&point) == 1;
+    }
+
     void negate(point1& point) noexcept
     {
         ECP_neg((ECP*)&point);
@@ -187,6 +192,11 @@ namespace crypto12381::detail::miracl_core
     void to_bytes(bytes_view& result, point2& point, bool compressed) noexcept
     {
         ECP2_toOctet((octet*)&result, (ECP2*)&point, compressed);
+    }
+
+    bool is_infinity(const point2& point) noexcept
+    {
+        return ECP2_isinf((const ECP2*)&point) == 1;
     }
 
     void multiply(point2& object, const big& value) noexcept

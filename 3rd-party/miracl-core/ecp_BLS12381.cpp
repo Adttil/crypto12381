@@ -28,7 +28,7 @@ using namespace B384_58;
 using namespace BLS12381;
 
 /* test for P=O point-at-infinity */
-int BLS12381::ECP_isinf(ECP *P)
+int BLS12381::ECP_isinf(const ECP *P)
 {
 
 #if CURVETYPE_BLS12381==EDWARDS

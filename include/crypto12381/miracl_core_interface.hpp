@@ -91,6 +91,8 @@ namespace crypto12381::detail::miracl_core
 
     void to_bytes(bytes_view& result, point1& point, bool compressed) noexcept;
 
+    bool is_infinity(const point1& point) noexcept;
+
     void negate(point1& point) noexcept;
 
     // object = object + point
@@ -142,6 +144,8 @@ namespace crypto12381::detail::miracl_core
     int from_bytes(point2& result, bytes_view& bytes) noexcept;
 
     void to_bytes(bytes_view& result, point2& point, bool compressed) noexcept;
+
+    bool is_infinity(const point2& point) noexcept;
 
     // object = value * object
     void multiply(point2& object, const big& value) noexcept;

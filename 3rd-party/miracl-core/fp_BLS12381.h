@@ -72,7 +72,7 @@ extern void FP_from_int(FP *x,int a);
 	@param x FP number to be tested
 	@return 1 if zero, else returns 0
  */
-extern int FP_iszilch(FP *x);
+extern int FP_iszilch(const FP *x);
 
 /**	@brief Tests for lexically largest 
  *
@@ -129,7 +129,7 @@ extern void FP_rcopy(FP *y, const B384_58::BIG x);
 	@param y FP number
 	@return 1 if equal, else returns 0
  */
-extern int FP_equals(FP *x, FP *y);
+extern int FP_equals(const FP *x, const FP *y);
 
 
 /**	@brief Conditional constant time swap of two FP numbers

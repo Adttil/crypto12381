@@ -77,7 +77,7 @@ extern const B384_58::BIG CURVE_Pyb; /**< imaginary part of y-coordinate of gene
 	@param P ECP2 point to be tested
 	@return 1 if infinity, else returns 0
  */
-extern int ECP2_isinf(ECP2 *P);
+extern int ECP2_isinf(const ECP2 *P);
 /**	@brief Copy ECP2 point to another ECP2 point
  *
 	@param P ECP2 instance, on exit = Q
