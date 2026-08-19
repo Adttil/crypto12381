@@ -11,6 +11,7 @@ namespace crypto12381
     namespace detail 
     {
         class GTPoint;
+        class GTMiller;
 
         template<typename P, typename V>
         class GTPair;
@@ -34,6 +35,15 @@ namespace crypto12381::detail::sets
 
 namespace crypto12381::detail
 {
+    template<typename T>
+    inline constexpr bool is_gt_pair = false;
+
+    template<typename P1, typename P2>
+    inline constexpr bool is_gt_pair<GTPair<P1, P2>> = true;
+
+    template<typename T>
+    concept gt_pair = is_gt_pair<std::remove_cvref_t<T>>;
+
     template<typename T>
     concept gt_reusable = std::is_object_v<decltype(std::declval<T>().GT_point())> || 
             std::is_rvalue_reference_v<decltype(std::declval<T>().GT_point())>;
@@ -106,13 +116,13 @@ namespace crypto12381::detail
             if constexpr(gt_reusable<Self>)
             {
                 decltype(auto) result = std::forward<Self>(self).GT_point();
-                miracl_core::inverse(result.data_, result.data_);
+                miracl_core::conjugate(result.data_, result.data_);
                 return result;
             }
             else
             {
                 GTPoint result = std::forward<Self>(self).GT_point();
-                miracl_core::inverse(result.data_, result.data_);
+                miracl_core::conjugate(result.data_, result.data_);
                 return result;
             }
         }
@@ -163,12 +173,6 @@ namespace crypto12381::detail
             }
         }
 
-        template<specified<GTPoint> L, GT_element R>
-        friend constexpr bool operator==(L&& l, R&& r) noexcept
-        {
-            return miracl_core::equal(data(l.GT_point()), data(r.GT_point())) == 1;
-        }
-
     private:
         constexpr GTPoint() noexcept = default;
 
@@ -178,10 +182,89 @@ namespace crypto12381::detail
         GTPointData data_;
     };
 
+    class GTMiller
+    {
+        friend DataAccessor;
+        template<typename, typename>
+        friend class GTPair;
+
+        template<GT_element L, GT_element R>
+        friend constexpr bool operator==(L&& l, R&& r) noexcept;
+    public:
+        constexpr GTMiller(const GTMiller&) = default;
+        constexpr GTMiller(GTMiller&&) = default;
+
+        template<typename Self>
+        operator GTPoint(this Self&& self) noexcept
+        {
+            return std::forward<Self>(self).GT_point();
+        }
+
+        template<typename Self>
+        constexpr GTPoint GT_point(this Self&& self) noexcept
+        {
+            auto result = data.create<GTPoint>(std::forward_like<Self>(self.data_));
+            miracl_core::pair_final_exponentiation(data(result));
+            return result;
+        }
+
+        template<specified<GTMiller> Self>
+        friend constexpr GTMiller inverse(Self&& self) noexcept
+        {
+            GTMiller result{ std::forward<Self>(self) };
+            miracl_core::conjugate(result.data_, result.data_);
+            return result;
+        }
+
+        template<GT_element L, GT_element R>
+        requires
+            (specified<L, GTMiller> || specified<R, GTMiller>) &&
+            (specified<L, GTMiller> || gt_pair<L>) &&
+            (specified<R, GTMiller> || gt_pair<R>)
+        friend constexpr GTMiller operator*(L&& l, R&& r) noexcept
+        {
+            GTMiller result{ std::forward<L>(l) };
+            GTMiller other{ std::forward<R>(r) };
+            miracl_core::multiply(result.data_, other.data_);
+            return result;
+        }
+
+        template<GT_element L, specified<GTMiller> R>
+        friend constexpr GTMiller operator/(L&& l, R&& r) noexcept
+        {
+            return std::forward<L>(l) * inverse(std::forward<R>(r));
+        }
+
+        template<specified<GTMiller> P, Zp_element V>
+        friend constexpr auto operator^(P&& point, V&& number) noexcept
+        {
+            return std::forward<P>(point).GT_point() ^ std::forward<V>(number);
+        }
+
+    private:
+        constexpr GTMiller() noexcept = default;
+
+        template<gt_pair Pair>
+        constexpr explicit GTMiller(Pair&& pair) noexcept
+        {
+            miracl_core::pair_ate(
+                data_,
+                data(std::forward<Pair>(pair).p2().G2_point()),
+                data(std::forward<Pair>(pair).p1().G1_point())
+            );
+        }
+
+        GTMiller& operator=(const GTMiller&) = default;
+        GTMiller& operator=(GTMiller&&) = default;
+
+        GTPointData data_;
+    };
+
     template<typename P1, typename P2>
     class GTPair
     {
         friend DataAccessor;
+        friend class GTMiller;
         template<typename, typename>
         friend class GTPair;
     public:
@@ -197,14 +280,7 @@ namespace crypto12381::detail
         template<typename Self>
         constexpr GTPoint GT_point(this Self&& self) noexcept
         {
-            auto result = data.create<GTPoint>();
-            miracl_core::pair_ate(
-                data(result),
-                data(std::forward<Self>(self).p2().G2_point()), 
-                data(std::forward<Self>(self).p1().G1_point())
-            );
-            miracl_core::pair_final_exponentiation(data(result));
-            return result;
+            return GTMiller{ std::forward<Self>(self) }.GT_point();
         }
 
         // void show() const
@@ -212,10 +288,10 @@ namespace crypto12381::detail
         //     BLS12381::FP12_output(data(GT_point()));
         // }
 
-        template<specified<GTPair> L, GT_element R> requires (not specified<R, GTPoint>)
-        friend constexpr GTPoint operator*(L&& l, R&& r) noexcept
+        template<specified<GTPair> L, gt_pair R>
+        friend constexpr GTMiller operator*(L&& l, R&& r) noexcept
         {
-            auto result = data.create<GTPoint>();
+            auto result = data.create<GTMiller>();
             miracl_core::pair_double_ate(
                 data(result),
                 data(std::forward<L>(l).p2().G2_point()), 
@@ -223,20 +299,13 @@ namespace crypto12381::detail
                 data(std::forward<R>(r).p2().G2_point()), 
                 data(std::forward<R>(r).p1().G1_point())
             );
-            miracl_core::pair_final_exponentiation(data(result));
             return result;
         }
 
         template<specified<GTPair> P, Zp_element V>
         friend constexpr auto operator^(P&& point, V&& number) noexcept
         {
-            return (GTPoint)std::forward<P>(point) ^ number;
-        }
-
-        template<specified<GTPair> L, GT_element R>
-        friend constexpr bool operator==(L&& l, R&& r) noexcept
-        {
-            return miracl_core::equal(data(l.GT_point()), data(r.GT_point())) == 1;
+            return (GTPoint)std::forward<P>(point) ^ std::forward<V>(number);
         }
     private:
         constexpr explicit GTPair(P1&& p1, P2&& p2) noexcept
@@ -262,6 +331,29 @@ namespace crypto12381::detail
     constexpr GTPair<P1, P2> pair(P1&& p1, P2&& p2) noexcept
     {
         return GTPair<P1, P2>{ std::forward<P1>(p1), std::forward<P2>(p2) };
+    }
+
+    template<GT_element L, GT_element R>
+    constexpr bool operator==(L&& l, R&& r) noexcept
+    {
+        if constexpr(
+            (specified<L, GTMiller> || gt_pair<L>) &&
+            (specified<R, GTMiller> || gt_pair<R>)
+        )
+        {
+            GTMiller result{ std::forward<L>(l) };
+            GTMiller inverse_r{ std::forward<R>(r) };
+            miracl_core::conjugate(inverse_r.data_, inverse_r.data_);
+            miracl_core::multiply(result.data_, inverse_r.data_);
+            miracl_core::pair_final_exponentiation(result.data_);
+            return miracl_core::is_unity(result.data_);
+        }
+        else
+        {
+            auto left = std::forward<L>(l).GT_point();
+            auto right = std::forward<R>(r).GT_point();
+            return miracl_core::equal(left | data, right | data) == 1;
+        }
     }
 
     template<GT_element T>

@@ -62,6 +62,8 @@ namespace crypto12381::detail
 
         friend class GTPoint;
 
+        friend class GTMiller;
+
         template<typename, typename >
         friend class GTPair;
     };

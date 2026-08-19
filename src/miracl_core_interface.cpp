@@ -248,9 +248,9 @@ namespace crypto12381::detail::miracl_core
         FP12_toOctet((octet*)&result, (FP12*)&value);
     }
 
-    void inverse(fp12& result, fp12& value) noexcept
+    void conjugate(fp12& result, fp12& value) noexcept
     {
-        FP12_inv((FP12*)&result, (FP12*)&value);
+        FP12_conj((FP12*)&result, (FP12*)&value);
     }
 
     void multiply(fp12& result, fp12& value) noexcept
@@ -266,6 +266,11 @@ namespace crypto12381::detail::miracl_core
     int equal(fp12& l, fp12& r) noexcept
     {
         return FP12_equals((FP12*)&l, (FP12*)&r);
+    }
+
+    bool is_unity(fp12& value) noexcept
+    {
+        return FP12_isunity((FP12*)&value) == 1;
     }
 
     void pair_ate(fp12& result, point2& p2, point1& p1) noexcept

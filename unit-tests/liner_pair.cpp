@@ -78,6 +78,54 @@ TEST_CASE("Double pairing matches two independent pairings", "[pairing]")
     CHECK(optimized == separate);
 }
 
+TEST_CASE("Equivalent pairing expressions compare equal", "[pairing][GT]")
+{
+    auto random = create_random_engine("pairing equality seed");
+    const auto first = select_g1(random);
+    const auto second = select_g2(random);
+    const auto x = random-select_in<Zp>;
+
+    CHECK(pair(first ^ x, second) == pair(first, second ^ x));
+    CHECK_FALSE(pair(first ^ x, second) == pair(first, second ^ (x + make_Zp(1))));
+}
+
+TEST_CASE("Products of pairings preserve bilinearity", "[pairing][GT]")
+{
+    auto random = create_random_engine("pairing product seed");
+    const auto first = select_g1(random);
+    const auto second = select_g1(random);
+    const auto third = select_g1(random);
+    const auto g2 = select_g2(random);
+
+    const auto triple_product = pair(first, g2) * pair(second, g2) * pair(third, g2);
+
+    CHECK(triple_product == pair(first * second * third, g2));
+}
+
+TEST_CASE("Products of pairings satisfy inverse laws", "[pairing][GT]")
+{
+    auto random = create_random_engine("pairing product inversion seed");
+    const auto first = select_g1(random);
+    const auto g2 = select_g2(random);
+    const auto value = pair(first, g2) * pair(first, g2);
+    const auto identity = evaluate_pairing(first / first, g2);
+
+    CHECK(value * inverse(value) == identity);
+    CHECK(value / value == identity);
+}
+
+TEST_CASE("Products of pairings can be serialized", "[GT][serialization]")
+{
+    auto random = create_random_engine("pairing product serialization seed");
+    const auto first = select_g1(random);
+    const auto second = select_g2(random);
+    const auto third = select_g1(random);
+    const auto product = pair(first, second) * pair(third, second);
+    const serialized_field<GT> bytes = serialize(product);
+
+    CHECK(parse<GT>(bytes) == evaluate_pairing(first * third, second));
+}
+
 TEST_CASE("GT operations satisfy group and exponent laws", "[GT][arithmetic]")
 {
     auto random = create_random_engine("GT group law seed");

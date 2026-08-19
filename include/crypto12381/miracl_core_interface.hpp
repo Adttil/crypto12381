@@ -187,13 +187,15 @@ namespace crypto12381::detail::miracl_core
 
     void to_bytes(bytes_view& result, fp12& value) noexcept;
 
-    void inverse(fp12& result, fp12& value) noexcept;
+    void conjugate(fp12& result, fp12& value) noexcept;
 
     void multiply(fp12& result, fp12& value) noexcept;
 
     void pow(fp12& result, fp12& base, const big& exponent) noexcept;
 
     int equal(fp12& l, fp12& r) noexcept;
+
+    bool is_unity(fp12& value) noexcept;
 
     void pair_ate(fp12& result, point2& p2, point1& p1) noexcept;
 
