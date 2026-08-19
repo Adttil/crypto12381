@@ -1096,9 +1096,9 @@ namespace crypto12381
                     using type = std::remove_cvref_t<Tx>;
                     auto n = std::ranges::size(a);
                     auto a_ = (Ra&&)a | algebraic; 
-                    auto x_pow = sequence(1, n) 
+                    auto x_pow = sequence(1uz, n + 1uz)
                     | transform([&](auto i){ return make_Zp((type)std::pow(x, i)); });
-                    return a0 + Σ[n - 1](a_[i] * x_pow[i]);
+                    return a0 + Σ[n](a_[i] * x_pow[i]);
                 }
                 else
                 {
