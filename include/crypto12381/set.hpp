@@ -452,7 +452,7 @@ namespace crypto12381::detail
             }
         }
 
-        template<typename T, typename Self>
+        template<typename T>
         constexpr hash_state operator|(const T& t) const noexcept
         {
             return hash_state{} | t;
