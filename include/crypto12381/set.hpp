@@ -368,7 +368,10 @@ namespace crypto12381::detail
                 serialized_field<group_of<T>()> buffer = serialize(t);
                 process(buffer);
             }
-            else if constexpr(std::is_trivially_copyable_v<T>)
+            else if constexpr(
+                std::is_trivially_copyable_v<T>
+                && not std::ranges::range<const T&>
+            )
             {
                 process(std::span{ reinterpret_cast<const char(&)[sizeof(T)]>(t) });
             }
