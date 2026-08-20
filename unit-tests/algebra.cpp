@@ -90,8 +90,41 @@ TEST_CASE("unwrap exposes the underlying range", "[algebra]")
 {
     std::array values{ 1, 2, 3 };
     auto wrapped = values | algebraic;
-    auto&& unwrapped = wrapped | unwrap;
+    auto&& unwrapped = unwrap(wrapped);
 
     STATIC_REQUIRE(std::same_as<decltype(unwrapped), std::array<int, 3>&>);
     CHECK(unwrapped.data() == values.data());
+}
+
+TEST_CASE("algebraic rewraps an lvalue algebraic range by value", "[algebra]")
+{
+    std::array values{ 1, 2, 3 };
+    auto wrapped = values | algebraic;
+    auto rewrapped = wrapped | algebraic;
+
+    STATIC_REQUIRE(std::same_as<decltype(algebraic(wrapped)), decltype(wrapped)>);
+    STATIC_REQUIRE(std::same_as<decltype(wrapped | algebraic), decltype(wrapped)>);
+    CHECK(rewrapped.data() == values.data());
+}
+
+TEST_CASE("algebraic takes ownership when rewrapping an rvalue algebraic range", "[algebra]")
+{
+    auto wrapped = std::array{ 1, 2, 3 } | algebraic;
+    auto rewrapped = std::move(wrapped) | algebraic;
+
+    STATIC_REQUIRE(std::same_as<decltype(std::move(wrapped) | algebraic), decltype(wrapped)>);
+    CHECK(rewrapped[0] == 1);
+    CHECK(rewrapped[1] == 2);
+    CHECK(rewrapped[2] == 3);
+}
+
+TEST_CASE("algebraic removes const when storing an rvalue algebraic range", "[algebra]")
+{
+    const auto wrapped = std::array{ 1, 2, 3 } | algebraic;
+    auto rewrapped = std::move(wrapped) | algebraic;
+
+    STATIC_REQUIRE(std::same_as<decltype(rewrapped), std::remove_const_t<decltype(wrapped)>>);
+    CHECK(rewrapped[0] == 1);
+    CHECK(rewrapped[1] == 2);
+    CHECK(rewrapped[2] == 3);
 }

@@ -74,49 +74,7 @@ namespace crypto12381
 
     namespace detail 
     {
-        struct algebraic_fn : std::ranges::range_adaptor_closure<algebraic_fn>
-        {
-            template<std::ranges::range R>
-            constexpr auto operator()(R&& r)const
-            {
-                if constexpr(std::ranges::random_access_range<R>)
-                {
-                    return algebraic_range<R>{ std::forward<R>(r) };
-                }
-                else
-                {
-                    return algebraic_range<decltype(std::forward<R>(r) | std::ranges::to<std::vector>())>{ 
-                        std::forward<R>(r) | std::ranges::to<std::vector>() 
-                    };
-                }
-            }
-
-            template<class V>
-            constexpr decltype(auto) operator()(algebraic_range<V>& v)const
-            {
-                return v;
-            }
-
-            template<class V>
-            constexpr decltype(auto) operator()(const algebraic_range<V>& v)const
-            {
-                return v;
-            }
-
-            template<class V>
-            constexpr decltype(auto) operator()(algebraic_range<V>&& v)const
-            {
-                return std::move(v);
-            }
-
-            template<class V>
-            constexpr decltype(auto) operator()(const algebraic_range<V>&& v)const
-            {
-                return std::move(v);
-            }
-        };
-
-        struct unwrap_fn : std::ranges::range_adaptor_closure<unwrap_fn>
+        struct unwrap_fn
         {
             template<std::ranges::range R>
             constexpr R&& operator()(R&& r)const
@@ -149,14 +107,57 @@ namespace crypto12381
             }
         };
     }
+
+    inline namespace functors
+    {
+        inline constexpr detail::unwrap_fn unwrap{};
+    }
+
+    namespace detail
+    {
+        struct algebraic_fn : std::ranges::range_adaptor_closure<algebraic_fn>
+        {
+            template<std::ranges::range R>
+            constexpr auto operator()(R&& r)const
+            {
+                auto&& unwrap_r = unwrap(std::forward<R>(r));
+                using unwrap_t = decltype(unwrap_r);
+
+                if constexpr(std::ranges::random_access_range<unwrap_t>)
+                {
+                    using stored_t = std::conditional_t<
+                        std::is_lvalue_reference_v<unwrap_t>,
+                        unwrap_t,
+                        std::remove_cvref_t<unwrap_t>
+                    >;
+                    return algebraic_range<stored_t>{ std::forward<unwrap_t>(unwrap_r) };
+                }
+                else
+                {
+                    return algebraic_range<decltype(std::forward<unwrap_t>(unwrap_r) | std::ranges::to<std::vector>())>{
+                        std::forward<unwrap_t>(unwrap_r) | std::ranges::to<std::vector>()
+                    };
+                }
+            }
+        };
+
+        struct unwrap_all_fn : std::ranges::range_adaptor_closure<unwrap_all_fn>
+        {
+            template<std::ranges::range R>
+            constexpr auto operator()(R&& r)const
+            {
+                return std::views::all(unwrap(std::forward<R>(r)));
+            }
+        };
+
+        inline constexpr unwrap_all_fn unwrap_all{};
+    }
     
     inline namespace functors 
     {
         inline constexpr detail::algebraic_fn algebraic{};
 
-        inline constexpr detail::unwrap_fn unwrap{};
-
-        inline constexpr auto materialize = unwrap | std::ranges::to<std::vector>() | algebraic;
+        inline constexpr auto materialize = detail::unwrap_all | std::ranges::to<std::vector>() | algebraic;
     }
 
     namespace detail 
@@ -166,7 +167,7 @@ namespace crypto12381
             template<class Fn>
             constexpr auto operator()(Fn&& fn)const
             {
-                return unwrap | std::views::transform(std::forward<Fn>(fn)) | algebraic;
+                return unwrap_all | std::views::transform(std::forward<Fn>(fn)) | algebraic;
             }
         };
 
@@ -175,7 +176,7 @@ namespace crypto12381
             template<class Fn>
             constexpr auto operator()(Fn&& fn)const
             {
-                return unwrap | std::views::filter(std::forward<Fn>(fn)) | algebraic;
+                return unwrap_all | std::views::filter(std::forward<Fn>(fn)) | algebraic;
             }
         };
     }
@@ -614,9 +615,10 @@ namespace crypto12381
     public:
         algebraic_range() requires std::default_initializable<R> = default;
 
-        constexpr algebraic_range(R&& base) 
-        noexcept(std::is_nothrow_move_constructible_v<R>)
-        : base_{ (R&&)base }
+        template<class T>
+        constexpr algebraic_range(T&& base)
+        noexcept(std::is_nothrow_constructible_v<R, T>)
+        : base_{ (T&&)base }
         {}
 
         // algebraic_range(algebraic_range&&)            = default;
